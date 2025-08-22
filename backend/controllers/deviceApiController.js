@@ -1,5 +1,96 @@
 const Device = require('../models/Device');
 const ActivityLog = require('../models/ActivityLog');
+const securityService = require('../services/securityService');
+const { logger } = require('../middleware/logger');
+
+class DeviceNotIdentifiedError extends Error {
+    constructor(message = 'Device not identified') {
+        super(message);
+        this.name = 'DeviceNotIdentifiedError';
+    }
+}
+
+class DeviceOfflineError extends Error {
+    constructor(message = 'Device is offline') {
+        super(message);
+        this.name = 'DeviceOfflineError';
+    }
+}
+
+class SecurityError extends Error {
+    constructor(message = 'Security check failed') {
+        super(message);
+        this.name = 'SecurityError';
+    }
+}
+
+exports.toggleSwitch = async (req, res, next) => {
+    try {
+        const { deviceId, switchId } = req.params;
+        
+        // Security checks
+        if (securityService.isBlacklisted(deviceId)) {
+            logger.warn(`Blocked request from blacklisted device ${deviceId}`);
+            throw new SecurityError('Device is blacklisted');
+        }
+
+        if (!await securityService.checkRateLimit(deviceId, 100, 60000)) {
+            throw new SecurityError('Rate limit exceeded');
+        }
+
+        if (!securityService.validateRequest(req, deviceId)) {
+            securityService.trackActivity(deviceId, { type: 'auth_failure' });
+            throw new SecurityError('Invalid request signature');
+        }
+
+        const device = await Device.findById(deviceId);
+        
+        if (!device) {
+            return res.status(404).json({ error: 'Device not found' });
+        }
+
+        // Check if device is identified and online
+        if (!device.isIdentified) {
+            throw new DeviceNotIdentifiedError();
+        }
+
+        const lastSeen = new Date(device.lastSeen);
+        const now = new Date();
+        if (now - lastSeen > 60000) { // More than 1 minute offline
+            throw new DeviceOfflineError();
+        }
+
+        // Add retry mechanism for toggle
+        let retries = 3;
+        while (retries > 0) {
+            try {
+                const result = await device.toggleSwitch(switchId);
+                // Log activity
+                await ActivityLog.create({
+                    device: deviceId,
+                    switch: switchId,
+                    action: 'toggle',
+                    status: 'success',
+                    details: result
+                });
+                return res.json({ success: true, result });
+            } catch (err) {
+                retries--;
+                if (retries === 0) throw err;
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+    } catch (err) {
+        await ActivityLog.create({
+            device: req.params.deviceId,
+            switch: req.params.switchId,
+            action: 'toggle',
+            status: 'error',
+            details: err.message
+        });
+        next(err);
+    }
+};
 
 exports.getDeviceConfig = async (req, res) => {
     try {

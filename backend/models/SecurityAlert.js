@@ -16,7 +16,16 @@ const securityAlertSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['timeout', 'unauthorized_access', 'device_offline', 'motion_override'],
+    enum: [
+      'timeout', 
+      'unauthorized_access', 
+      'device_offline', 
+      'motion_override',
+      'auth_failure',
+      'rate_limit',
+      'suspicious_activity',
+      'blacklist'
+    ],
     required: true
   },
   severity: {
@@ -24,6 +33,7 @@ const securityAlertSchema = new mongoose.Schema({
     enum: ['low', 'medium', 'high', 'critical'],
     default: 'medium'
   },
+  ip: String,
   acknowledged: {
     type: Boolean,
     default: false
@@ -43,10 +53,21 @@ const securityAlertSchema = new mongoose.Schema({
   },
   resolvedAt: Date,
   metadata: {
-    switchId: String,
-    switchName: String,
-    duration: Number,
-    autoResolved: Boolean
+    type: Map,
+    of: mongoose.Schema.Types.Mixed,
+    default: () => ({
+      switchId: null,
+      switchName: null,
+      duration: null,
+      autoResolved: false,
+      attempts: 0,
+      lastAttempt: null
+    })
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+    expires: 2592000 // 30 days TTL for old resolved alerts
   }
 }, {
   timestamps: true

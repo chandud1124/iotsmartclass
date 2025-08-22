@@ -1,5 +1,28 @@
 const { logger } = require('./logger');
 
+const errorTypes = {
+    DEVICE_NOT_IDENTIFIED: {
+        code: 'device_not_identified',
+        status: 409,
+        message: 'Device is not identified/connected'
+    },
+    DEVICE_OFFLINE: {
+        code: 'device_offline',
+        status: 409,
+        message: 'Device is currently offline'
+    },
+    INVALID_STATE: {
+        code: 'invalid_state',
+        status: 400,
+        message: 'Invalid device state'
+    },
+    OPERATION_TIMEOUT: {
+        code: 'operation_timeout',
+        status: 408,
+        message: 'Operation timed out'
+    }
+};
+
 const errorHandler = (err, req, res, next) => {
     // Log error details
     logger.error('Error:', {
@@ -26,6 +49,22 @@ const errorHandler = (err, req, res, next) => {
                 message: 'A record with that information already exists'
             });
         }
+    }
+
+    if (err.name === 'DeviceNotIdentifiedError') {
+        return res.status(409).json({
+            error: 'Device Not Identified',
+            code: 'device_not_identified',
+            message: 'Device is not identified/connected. Please wait for the device to connect and try again.'
+        });
+    }
+
+    if (err.name === 'DeviceOfflineError') {
+        return res.status(409).json({
+            error: 'Device Offline',
+            code: 'device_offline',
+            message: 'Device is currently offline. Please check the device connection.'
+        });
     }
 
     if (err.name === 'JsonWebTokenError') {
