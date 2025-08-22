@@ -1,0 +1,573 @@
+#include <WiFi.h>
+#include <WebSocketsClient.h>
+#include <ArduinoJson.h>
+#include <Preferences.h>
+#include <esp_task_wdt.h>
+#include "config.h"
+
+// ========= Globals =========
+Preferences prefs;
+WebSocketsClient ws;
+
+SwitchConfig switchCfg[MAX_SWITCHES];     // Active config (NVS or defaults)
+bool relayState[MAX_SWITCHES] = {false};  // Current relay ON/OFF (true=ON)
+
+// Debounce for maintained switches
+bool lastStableManual[MAX_SWITCHES] = {false};
+bool lastReadManual[MAX_SWITCHES]   = {false};
+unsigned long lastChangeMs[MAX_SWITCHES] = {0};
+
+// Connection / timers
+enum ConnState { WIFI_DISCONNECTED, WIFI_ONLY, BACKEND_CONNECTED };
+ConnState connState = WIFI_DISCONNECTED;
+unsigned long lastWiFiRetry = 0;
+unsigned long lastHeartbeat = 0;
+unsigned long lastScheduleCheck = 0;
+int reconnectionAttempts = 0;
+bool isOfflineMode = false;
+
+// Command queue (serialize backend actions)
+struct Command { int idx; bool state; };
+QueueHandle_t cmdQueue;
+
+// Scheduling
+struct Schedule {
+  uint8_t hour;
+  uint8_t minute;
+  bool isOn;
+  uint8_t daysOfWeek;  // Bit field: bit 0 = Sunday, bit 1 = Monday, etc.
+  int switchIdx;
+  bool enabled;
+};
+#define MAX_SCHEDULES 10
+Schedule schedules[MAX_SCHEDULES];
+int numSchedules = 0;
+
+// Manual override tracking
+bool manualOverride[MAX_SWITCHES] = {false};
+
+// Forward decls
+void loadConfigFromNVS();
+void saveConfigToNVS();
+void loadSchedulesFromNVS();
+void saveSchedulesToNVS();
+void applyPinModes();
+void readAllManualAndApply(bool notifyBackend);
+void setRelay(int idx, bool on, bool notifyBackend);
+void sendFullState();
+void sendHeartbeat();
+void blinkStatus();
+void handleManualMaintained();
+void setupWebSocket();
+void onWsEvent(WStype_t type, uint8_t * payload, size_t length);
+void checkSchedules();
+
+// ========= Setup =========
+void setup() {
+  Serial.begin(115200);
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, LOW);
+
+  // Watchdog setup (ESP-IDF v5 API) - 10s timeout, monitor all cores, panic on timeout
+  esp_task_wdt_config_t twdt_config = { 
+    .timeout_ms = 10000, 
+    .idle_core_mask = (1 << portNUM_PROCESSORS) - 1, 
+    .trigger_panic = true 
+  };
+  esp_task_wdt_init(&twdt_config);
+  esp_task_wdt_add(NULL);  // Add current task (loopTask)
+
+  // Load config (NVS -> fallback to defaults)
+  loadConfigFromNVS();
+  loadSchedulesFromNVS();
+  applyPinModes();
+
+  // Initialize states to reflect actual maintained switch positions at boot
+  readAllManualAndApply(false); // no notify yet
+
+  // Command queue
+  cmdQueue = xQueueCreate(16, sizeof(Command));
+
+  // Start WiFi (non-blocking reconnect loop in loop())
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  // Start WebSocket (connect when WiFi is up)
+  setupWebSocket();
+}
+
+// ========= Loop =========
+void loop() {
+  esp_task_wdt_reset();
+
+  // ----- WiFi connect/retry -----
+  if (WiFi.status() != WL_CONNECTED) {
+    connState = WIFI_DISCONNECTED;
+    isOfflineMode = true;
+    unsigned long now = millis();
+    if (now - lastWiFiRetry >= WIFI_RETRY_INTERVAL_MS) {
+      lastWiFiRetry = now;
+      if (WiFi.status() != WL_IDLE_STATUS) WiFi.disconnect(true);
+      WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+      Serial.println("[WiFi] (re)connecting...");
+    }
+  } else {
+    if (!ws.isConnected()) {
+      connState = WIFI_ONLY;
+      isOfflineMode = true;
+    } else {
+      connState = BACKEND_CONNECTED;
+      isOfflineMode = false;
+    }
+  }
+
+  // ----- WebSocket -----
+  ws.loop();
+
+  // ----- LED pattern -----
+  blinkStatus();
+
+  // ----- Maintained switches (debounced) -----
+  handleManualMaintained();
+
+  // ----- Dequeue backend commands -----
+  Command c;
+  if (xQueueReceive(cmdQueue, &c, 0)) {
+    setRelay(c.idx, c.state, true); // notify backend so UI reflects final state
+  }
+
+  // ----- Heartbeat -----
+  sendHeartbeat();
+  
+  // ----- Check schedules -----
+  checkSchedules();
+}
+
+// ========= Config Persistence =========
+void loadConfigFromNVS() {
+  bool have = false;
+  prefs.begin("switchcfg", true);
+  if (prefs.isKey("relay0") && prefs.isKey("manual0")) have = true;
+  prefs.end();
+
+  // seed with defaults
+  for (int i = 0; i < MAX_SWITCHES; i++) {
+    switchCfg[i] = defaultSwitchConfigs[i];
+    relayState[i] = false;
+  }
+
+  if (have) {
+    prefs.begin("switchcfg", true);
+    for (int i = 0; i < MAX_SWITCHES; i++) {
+      switchCfg[i].relayPin = prefs.getInt(("relay"+String(i)).c_str(), switchCfg[i].relayPin);
+      switchCfg[i].manualPin = prefs.getInt(("manual"+String(i)).c_str(), switchCfg[i].manualPin);
+      relayState[i] = prefs.getBool(("state"+String(i)).c_str(), false);
+      manualOverride[i] = prefs.getBool(("override"+String(i)).c_str(), false);
+      // name + manualActiveLow remain from defaults unless also persisted
+      switchCfg[i].name = prefs.getString(("name"+String(i)).c_str(), switchCfg[i].name);
+      switchCfg[i].manualActiveLow = prefs.getBool(("activeLow"+String(i)).c_str(), switchCfg[i].manualActiveLow);
+    }
+    prefs.end();
+    Serial.println("[CFG] Loaded pin map and states from NVS");
+  } else {
+    Serial.println("[CFG] Using factory defaults");
+  }
+}
+
+void saveConfigToNVS() {
+  prefs.begin("switchcfg", false);
+  for (int i = 0; i < MAX_SWITCHES; i++) {
+    prefs.putInt(("relay"+String(i)).c_str(), switchCfg[i].relayPin);
+    prefs.putInt(("manual"+String(i)).c_str(), switchCfg[i].manualPin);
+    prefs.putBool(("state"+String(i)).c_str(), relayState[i]);
+    prefs.putBool(("override"+String(i)).c_str(), manualOverride[i]);
+    prefs.putString(("name"+String(i)).c_str(), switchCfg[i].name);
+    prefs.putBool(("activeLow"+String(i)).c_str(), switchCfg[i].manualActiveLow);
+  }
+  prefs.end();
+  Serial.println("[CFG] Saved pin map and states to NVS");
+}
+
+void loadSchedulesFromNVS() {
+  prefs.begin("schedules", true);
+  numSchedules = prefs.getInt("count", 0);
+  if (numSchedules > MAX_SCHEDULES) numSchedules = MAX_SCHEDULES;
+  
+  for (int i = 0; i < numSchedules; i++) {
+    schedules[i].hour = prefs.getUChar(("hour"+String(i)).c_str(), 0);
+    schedules[i].minute = prefs.getUChar(("min"+String(i)).c_str(), 0);
+    schedules[i].isOn = prefs.getBool(("on"+String(i)).c_str(), false);
+    schedules[i].daysOfWeek = prefs.getUChar(("days"+String(i)).c_str(), 0);
+    schedules[i].switchIdx = prefs.getInt(("switch"+String(i)).c_str(), 0);
+    schedules[i].enabled = prefs.getBool(("enabled"+String(i)).c_str(), false);
+  }
+  prefs.end();
+  Serial.printf("[SCHEDULE] Loaded %d schedules from NVS\n", numSchedules);
+}
+
+void saveSchedulesToNVS() {
+  prefs.begin("schedules", false);
+  prefs.putInt("count", numSchedules);
+  
+  for (int i = 0; i < numSchedules; i++) {
+    prefs.putUChar(("hour"+String(i)).c_str(), schedules[i].hour);
+    prefs.putUChar(("min"+String(i)).c_str(), schedules[i].minute);
+    prefs.putBool(("on"+String(i)).c_str(), schedules[i].isOn);
+    prefs.putUChar(("days"+String(i)).c_str(), schedules[i].daysOfWeek);
+    prefs.putInt(("switch"+String(i)).c_str(), schedules[i].switchIdx);
+    prefs.putBool(("enabled"+String(i)).c_str(), schedules[i].enabled);
+  }
+  prefs.end();
+  Serial.println("[SCHEDULE] Saved schedules to NVS");
+}
+
+void applyPinModes() {
+  for (int i = 0; i < MAX_SWITCHES; i++) {
+    // Configure relay pins as outputs
+    pinMode(switchCfg[i].relayPin, OUTPUT);
+    // Apply saved state or default to OFF
+    digitalWrite(switchCfg[i].relayPin, relayState[i] ? RELAY_ON_LEVEL : RELAY_OFF_LEVEL);
+    
+    // Configure manual switch pins as inputs with appropriate pull-up/down
+    if (switchCfg[i].manualPin >= 0) {
+      if (switchCfg[i].manualActiveLow) {
+        pinMode(switchCfg[i].manualPin, INPUT_PULLUP);
+      } else {
+        pinMode(switchCfg[i].manualPin, INPUT_PULLDOWN);
+      }
+    }
+  }
+}
+
+void readAllManualAndApply(bool notifyBackend) {
+  for (int i = 0; i < MAX_SWITCHES; i++) {
+    if (switchCfg[i].manualPin >= 0) {
+      int rawLevel = digitalRead(switchCfg[i].manualPin);
+      bool active = switchCfg[i].manualActiveLow ? (rawLevel == LOW) : (rawLevel == HIGH);
+      lastStableManual[i] = active;
+      lastReadManual[i] = active;
+      
+      // Apply manual switch state to relay
+      if (active != relayState[i]) {
+        setRelay(i, active, notifyBackend);
+        manualOverride[i] = true;
+        saveConfigToNVS(); // Save the manual override state
+      }
+    }
+  }
+}
+
+void setRelay(int idx, bool on, bool notifyBackend) {
+  if (idx < 0 || idx >= MAX_SWITCHES) return;
+  
+  relayState[idx] = on;
+  digitalWrite(switchCfg[idx].relayPin, on ? RELAY_ON_LEVEL : RELAY_OFF_LEVEL);
+  
+  // Save state to NVS for persistence during power loss
+  saveConfigToNVS();
+  
+  if (notifyBackend && ws.isConnected()) {
+    sendFullState();
+  }
+}
+
+void sendFullState() {
+  if (!ws.isConnected()) return;
+  
+  DynamicJsonDocument doc(1024);
+  doc["type"] = "state_update";
+  doc["mac"] = WiFi.macAddress();
+  JsonArray switches = doc.createNestedArray("switches");
+  
+  for (int i = 0; i < MAX_SWITCHES; i++) {
+    JsonObject sw = switches.createNestedObject();
+    sw["gpio"] = switchCfg[i].relayPin;
+    sw["state"] = relayState[i];
+    sw["manual_override"] = manualOverride[i];
+    sw["name"] = switchCfg[i].name;
+  }
+  
+  String jsonStr;
+  serializeJson(doc, jsonStr);
+  ws.sendTXT(jsonStr);
+  Serial.println("[WS] Sent full state update");
+}
+
+void sendHeartbeat() {
+  unsigned long now = millis();
+  if (now - lastHeartbeat < HEARTBEAT_INTERVAL_MS) return;
+  lastHeartbeat = now;
+  
+  if (ws.isConnected()) {
+    DynamicJsonDocument doc(256);
+    doc["type"] = "heartbeat";
+    doc["mac"] = WiFi.macAddress();
+    doc["uptime"] = now / 1000;
+    doc["offline_mode"] = isOfflineMode;
+    
+    String jsonStr;
+    serializeJson(doc, jsonStr);
+    ws.sendTXT(jsonStr);
+    Serial.println("[WS] Sent heartbeat");
+  }
+}
+
+void blinkStatus() {
+  unsigned long now = millis();
+  int pattern = 0;
+  
+  switch (connState) {
+    case WIFI_DISCONNECTED:
+      // Fast blink (250ms on, 250ms off)
+      pattern = (now % 500) < 250;
+      break;
+    case WIFI_ONLY:
+      // Medium blink (500ms on, 500ms off)
+      pattern = (now % 1000) < 500;
+      break;
+    case BACKEND_CONNECTED:
+      // Slow pulse (1s on, 1s off)
+      pattern = (now % 2000) < 1000;
+      break;
+  }
+  
+  digitalWrite(LED_PIN, pattern ? HIGH : LOW);
+}
+
+void handleManualMaintained() {
+  unsigned long now = millis();
+  
+  for (int i = 0; i < MAX_SWITCHES; i++) {
+    if (switchCfg[i].manualPin < 0) continue;
+    
+    // Read current level
+    int rawLevel = digitalRead(switchCfg[i].manualPin);
+    
+    // If level changed, start debounce
+    if (rawLevel != lastReadManual[i]) {
+      lastReadManual[i] = rawLevel;
+      lastChangeMs[i] = now;
+    }
+    
+    // Check if debounce period passed
+    if (rawLevel != lastStableManual[i] && (now - lastChangeMs[i] >= DEBOUNCE_MS)) {
+      // Debounced change detected
+      bool active = switchCfg[i].manualActiveLow ? (rawLevel == LOW) : (rawLevel == HIGH);
+      lastStableManual[i] = active;
+      
+      // Apply change to relay
+      if (active != relayState[i]) {
+        setRelay(i, active, true);
+        manualOverride[i] = true;
+        saveConfigToNVS(); // Save the manual override state
+      }
+    }
+  }
+}
+
+void setupWebSocket() {
+  ws.beginSSL(WEBSOCKET_HOST, WEBSOCKET_PORT, WEBSOCKET_PATH);
+  ws.onEvent(onWsEvent);
+  ws.setReconnectInterval(5000);
+}
+
+void onWsEvent(WStype_t type, uint8_t * payload, size_t length) {
+  switch (type) {
+    case WStype_DISCONNECTED:
+      Serial.println("[WS] Disconnected");
+      connState = WIFI_ONLY;
+      isOfflineMode = true;
+      break;
+      
+    case WStype_CONNECTED:
+      Serial.println("[WS] Connected");
+      // Send identification
+      DynamicJsonDocument doc(256);
+      doc["type"] = "identify";
+      doc["mac"] = WiFi.macAddress();
+      doc["secret"] = DEVICE_SECRET_KEY;
+      doc["offline_capable"] = true;
+      String jsonStr;
+      serializeJson(doc, jsonStr);
+      ws.sendTXT(jsonStr);
+      break;
+      
+    case WStype_TEXT: {
+      String text = String((char*)payload);
+      DynamicJsonDocument doc(1024);
+      DeserializationError error = deserializeJson(doc, text);
+      
+      if (error) {
+        Serial.print("[WS] JSON parse error: ");
+        Serial.println(error.c_str());
+        return;
+      }
+      
+      String type = doc["type"];
+      
+      if (type == "identified") {
+        Serial.println("[WS] Device identified by backend");
+        connState = BACKEND_CONNECTED;
+        isOfflineMode = false;
+        
+        // Send current state to sync with backend
+        sendFullState();
+        
+        // Process switch configuration if provided
+        if (doc.containsKey("switches")) {
+          JsonArray switches = doc["switches"];
+          for (JsonObject sw : switches) {
+            int idx = sw["index"];
+            if (idx >= 0 && idx < MAX_SWITCHES) {
+              if (sw.containsKey("name")) {
+                switchCfg[idx].name = sw["name"].as<String>();
+              }
+              if (sw.containsKey("relayPin")) {
+                switchCfg[idx].relayPin = sw["relayPin"];
+              }
+              if (sw.containsKey("manualPin")) {
+                switchCfg[idx].manualPin = sw["manualPin"];
+              }
+              if (sw.containsKey("manualActiveLow")) {
+                switchCfg[idx].manualActiveLow = sw["manualActiveLow"];
+              }
+            }
+          }
+          
+          // Apply new configuration
+          applyPinModes();
+          saveConfigToNVS();
+        }
+        
+        // Process schedules if provided
+        if (doc.containsKey("schedules")) {
+          JsonArray scheds = doc["schedules"];
+          numSchedules = min((int)scheds.size(), MAX_SCHEDULES);
+          
+          for (int i = 0; i < numSchedules; i++) {
+            JsonObject s = scheds[i];
+            schedules[i].hour = s["hour"];
+            schedules[i].minute = s["minute"];
+            schedules[i].isOn = s["isOn"];
+            schedules[i].daysOfWeek = s["daysOfWeek"];
+            schedules[i].switchIdx = s["switchIdx"];
+            schedules[i].enabled = s["enabled"];
+          }
+          
+          saveSchedulesToNVS();
+        }
+      }
+      else if (type == "switch_command") {
+        int idx = -1;
+        
+        // Find switch by GPIO
+        if (doc.containsKey("gpio")) {
+          int gpio = doc["gpio"];
+          for (int i = 0; i < MAX_SWITCHES; i++) {
+            if (switchCfg[i].relayPin == gpio) {
+              idx = i;
+              break;
+            }
+          }
+        }
+        // Or by index
+        else if (doc.containsKey("index")) {
+          idx = doc["index"];
+        }
+        
+        if (idx >= 0 && idx < MAX_SWITCHES) {
+          bool state = doc["state"];
+          
+          // Queue command instead of executing immediately
+          Command cmd = {idx, state};
+          xQueueSend(cmdQueue, &cmd, 0);
+          
+          // Clear manual override flag when controlled from backend
+          manualOverride[idx] = false;
+          saveConfigToNVS();
+        }
+      }
+      else if (type == "config_update") {
+        if (doc.containsKey("switches")) {
+          JsonArray switches = doc["switches"];
+          for (JsonObject sw : switches) {
+            int idx = sw["index"];
+            if (idx >= 0 && idx < MAX_SWITCHES) {
+              if (sw.containsKey("name")) {
+                switchCfg[idx].name = sw["name"].as<String>();
+              }
+              if (sw.containsKey("relayPin")) {
+                switchCfg[idx].relayPin = sw["relayPin"];
+              }
+              if (sw.containsKey("manualPin")) {
+                switchCfg[idx].manualPin = sw["manualPin"];
+              }
+              if (sw.containsKey("manualActiveLow")) {
+                switchCfg[idx].manualActiveLow = sw["manualActiveLow"];
+              }
+            }
+          }
+          
+          // Apply new configuration
+          applyPinModes();
+          saveConfigToNVS();
+        }
+      }
+      else if (type == "schedule_update") {
+        if (doc.containsKey("schedules")) {
+          JsonArray scheds = doc["schedules"];
+          numSchedules = min((int)scheds.size(), MAX_SCHEDULES);
+          
+          for (int i = 0; i < numSchedules; i++) {
+            JsonObject s = scheds[i];
+            schedules[i].hour = s["hour"];
+            schedules[i].minute = s["minute"];
+            schedules[i].isOn = s["isOn"];
+            schedules[i].daysOfWeek = s["daysOfWeek"];
+            schedules[i].switchIdx = s["switchIdx"];
+            schedules[i].enabled = s["enabled"];
+          }
+          
+          saveSchedulesToNVS();
+        }
+      }
+      break;
+    }
+  }
+}
+
+void checkSchedules() {
+  unsigned long now = millis();
+  if (now - lastScheduleCheck < 60000) return; // Check once per minute
+  lastScheduleCheck = now;
+  
+  // Get current time
+  time_t rawtime;
+  struct tm* timeinfo;
+  time(&rawtime);
+  timeinfo = localtime(&rawtime);
+  
+  int currentHour = timeinfo->tm_hour;
+  int currentMinute = timeinfo->tm_min;
+  int currentDay = timeinfo->tm_wday; // 0 = Sunday, 1 = Monday, etc.
+  int currentDayBit = 1 << currentDay;
+  
+  for (int i = 0; i < numSchedules; i++) {
+    if (!schedules[i].enabled) continue;
+    
+    // Check if schedule matches current time and day
+    if (schedules[i].hour == currentHour && 
+        schedules[i].minute == currentMinute &&
+        (schedules[i].daysOfWeek & currentDayBit)) {
+        
+      int switchIdx = schedules[i].switchIdx;
+      if (switchIdx >= 0 && switchIdx < MAX_SWITCHES) {
+        // Apply scheduled state
+        setRelay(switchIdx, schedules[i].isOn, true);
+        
+        // This is an automatic action, not a manual override
+        manualOverride[switchIdx] = false;
+        saveConfigToNVS();
+      }
+    }
+  }
+}
