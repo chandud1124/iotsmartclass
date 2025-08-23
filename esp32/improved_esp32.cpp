@@ -26,13 +26,13 @@
 #include <mbedtls/md.h>
 #endif
 
-#define WIFI_SSID "I am Not A Witch I am Your Wifi"
-#define WIFI_PASSWORD "Whoareu@0000"
-#define BACKEND_HOST "192.168.0.108"  // backend LAN IP
+#define WIFI_SSID "AIMS-WIFI"
+#define WIFI_PASSWORD "Aimswifi#2025"
+#define BACKEND_HOST "172.16.3.56"  // backend LAN IP
 #define BACKEND_PORT 3001
 #define WS_PATH "/esp32-ws"
 #define HEARTBEAT_MS 30000UL          // 30s heartbeat interval
-#define DEVICE_SECRET "6af44c010af8ba58514c6fa989c6e6d3469068f2d8da19a4" // device secret from backend
+#define DEVICE_SECRET "9545c46f0f9f494a27412fce1f5b22095550c4e88d82868f" // device secret from backend
 
 // Optional status LED (set to 255 to disable if your board lacks LED_BUILTIN)
 #ifndef STATUS_LED_PIN
@@ -46,8 +46,6 @@
 // Command queue size and processing interval
 #define MAX_COMMAND_QUEUE 16
 #define COMMAND_PROCESS_INTERVAL 100  // Process commands every 100ms
-
-// ...existing code...
 
 // WiFi reconnection constants
 #define WIFI_RETRY_INTERVAL_MS 30000UL
@@ -70,7 +68,6 @@ enum ConnState { WIFI_DISCONNECTED, WIFI_ONLY, BACKEND_CONNECTED };
 ConnState connState = WIFI_DISCONNECTED;
 unsigned long lastHeartbeat = 0;
 unsigned long lastStateSent = 0;
-// ...existing code...
 unsigned long lastCommandProcess = 0;
 unsigned long lastWiFiRetry = 0;
 unsigned long lastIdentifyAttempt = 0;
@@ -125,7 +122,6 @@ void saveConfigToNVS();
 void loadConfigFromNVS();
 void onWsEvent(WStype_t type, uint8_t * payload, size_t length);
 void setupRelays();
-// ...existing code...
 void processCommandQueue();
 void blinkStatus();
 void handleManualSwitches();
@@ -658,7 +654,7 @@ void setup() {
   esp_task_wdt_config_t twdt_config = { 
     .timeout_ms = WDT_TIMEOUT_MS, 
     .idle_core_mask = (1 << portNUM_PROCESSORS) - 1, 
-    .trigger_panic = true 
+    .trigger_panic = false // Changed from true to false for auto-restart
   };
   esp_task_wdt_init(&twdt_config);
   esp_task_wdt_add(NULL);  // Add current task (loopTask)
@@ -707,7 +703,6 @@ void setup() {
   }
   
   lastHeartbeat = millis();
-  // ...existing code...
   lastCommandProcess = millis();
   lastWiFiRetry = millis();
   

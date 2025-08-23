@@ -8,7 +8,7 @@
 #define WIFI_PASSWORD "Whoareu@0000"
 
 // ---------------- WebSocket ----------------
-#define WEBSOCKET_HOST "localhost"  // Local development server
+#define WEBSOCKET_HOST "172.16.3.56"  // Local development server
 #define WEBSOCKET_PORT 3001  // Backend server port
 // Raw WebSocket endpoint path (matches backend server.js)
 #define WEBSOCKET_PATH "/esp32-ws"
