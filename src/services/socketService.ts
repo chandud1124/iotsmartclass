@@ -6,7 +6,7 @@ class SocketService {
   private listeners: Map<string, Set<Function>> = new Map();
 
   constructor() {
-  const RAW_SOCKET_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+  const RAW_SOCKET_URL = import.meta.env.VITE_API_BASE_URL || 'http://172.16.3.56:3001';
     // If env base includes /api (used for REST), strip it for Socket.IO root namespace
     let derived = RAW_SOCKET_URL.replace(/\/$/, '');
     if (/\/api$/.test(derived)) {

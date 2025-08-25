@@ -121,7 +121,15 @@ app.use(helmet({
 // Manual preflight handler (before cors) to guarantee PATCH visibility
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
-    const devOrigins = ['http://localhost:5173','http://localhost:5174','http://localhost:5175'];
+    // Allow all LAN origins for development
+    const devOrigins = [
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://localhost:5175',
+      `http://${require('os').networkInterfaces()['en0']?.find(i=>i.family==='IPv4')?.address}:5173`, // Mac WiFi
+      `http://${require('os').networkInterfaces()['eth0']?.find(i=>i.family==='IPv4')?.address}:5173`, // Ethernet
+      '*'
+    ];
     const allowedOrigins = process.env.NODE_ENV === 'production'
       ? [process.env.FRONTEND_URL || 'https://your-frontend-domain.com']
       : devOrigins;
@@ -141,9 +149,33 @@ app.use((req, res, next) => {
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? [process.env.FRONTEND_URL || 'https://your-frontend-domain.com']
-    : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
+  origin: function(origin, callback) {
+    // Allow requests from localhost and LAN IPs
+    const allowed = [
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://localhost:5175',
+      'https://8fhvp51m-5173.inc1.devtunnels.ms', // Dev tunnel origin
+    ];
+    // Dynamically add LAN IPs
+    const os = require('os');
+    const nets = os.networkInterfaces();
+    Object.values(nets).forEach(ifaces => {
+      ifaces.forEach(iface => {
+        if (iface.family === 'IPv4' && !iface.internal) {
+          allowed.push(`http://${iface.address}:5173`);
+        }
+      });
+    });
+    if (!origin) {
+      callback(null, false); // No origin, allow (for curl, etc)
+    } else if (allowed.includes(origin)) {
+      callback(null, origin); // Echo allowed origin for credentials
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -158,9 +190,7 @@ app.use(express.urlencoded({ extended: true }));
 // Initialize main Socket.IO instance
 const io = socketIo(server, {
   cors: {
-    origin: process.env.NODE_ENV === 'production'
-      ? [process.env.FRONTEND_URL || 'https://your-frontend-domain.com']
-      : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
+    origin: '*', // Allow all origins in development
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true
   },

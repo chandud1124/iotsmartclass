@@ -53,6 +53,6 @@ router.put('/:deviceId', authorize('admin', 'faculty'), checkDeviceAccess, valid
 router.delete('/:deviceId', authorize('admin'), checkDeviceAccess, deleteDevice);
 
 // Switch operations
-router.post('/:deviceId/switches/:switchId/toggle', checkDeviceAccess, toggleSwitch);
+router.post('/:deviceId/switches/:switchId/toggle', authorize('admin', 'faculty'), checkDeviceAccess, toggleSwitch);
 
 module.exports = router;
