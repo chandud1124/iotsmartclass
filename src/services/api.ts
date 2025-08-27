@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 // Default backend port adjusted to 3001 (previous fallback 30011 caused connection errors)
-const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://172.16.3.56:3001/api';
+const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://172.16.3.56:3001/api'; // For REST API
 // Safety: if environment still points to deprecated port 30011, transparently switch to 3001
 const API_BASE_URL = RAW_API_BASE_URL.includes('30011')
   ? RAW_API_BASE_URL.replace('30011', '3001')

@@ -38,14 +38,18 @@ export const MasterSwitchCard: React.FC<MasterSwitchCardProps> = ({
     // eslint-disable-next-line no-console
     console.debug('[MasterSwitchCard] external vs derived mismatch', { externalTotal, derivedTotal, externalActive, derivedActive });
   }
-  const { customSwitches, addCustomSwitch, toggleCustomSwitch, deleteCustomSwitch } = useCustomMasterSwitches();
+  const { customSwitches, addCustomSwitch, toggleCustomSwitch, deleteCustomSwitch, toggleOnlineDevicesInCustomSwitch } = useCustomMasterSwitches();
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   // Derived master state: on only if every switch is on. We keep a local echo only to show immediate UI while server updates.
   const [forcedState, setForcedState] = useState<boolean | null>(null);
   const [newSwitch, setNewSwitch] = useState({
     name: '',
     accessCode: '',
-    selectedSwitches: [] as string[]
+    selectedSwitches: [] as string[],
+    _search: '',
+    _classroom: '',
+    _type: ''
   });
   const { toast } = useToast();
 
@@ -88,7 +92,7 @@ export const MasterSwitchCard: React.FC<MasterSwitchCardProps> = ({
       switches: newSwitch.selectedSwitches
     });
 
-    setNewSwitch({ name: '', accessCode: '', selectedSwitches: [] });
+  setNewSwitch({ name: '', accessCode: '', selectedSwitches: [], _search: '', _classroom: '', _type: '' });
     setShowCreateDialog(false);
     
     toast({
@@ -231,11 +235,39 @@ export const MasterSwitchCard: React.FC<MasterSwitchCardProps> = ({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => deleteCustomSwitch(customSwitch.id)}
+                      onClick={() => setConfirmDeleteId(customSwitch.id)}
                       className="text-destructive hover:text-destructive"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
+      {/* Confirm Delete Custom Switch Dialog */}
+      <Dialog open={!!confirmDeleteId} onOpenChange={() => setConfirmDeleteId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Custom Master Switch</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p>Are you sure you want to delete this custom master switch group? This action cannot be undone.</p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (confirmDeleteId) {
+                    deleteCustomSwitch(confirmDeleteId);
+                    setConfirmDeleteId(null);
+                    toast({ title: 'Custom Master Switch Deleted', description: 'The group has been deleted.' });
+                  }
+                }}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
                   </div>
                   <p className="text-xs text-muted-foreground mb-3">
                     {customSwitch.switches.length} switches in this group
@@ -246,7 +278,33 @@ export const MasterSwitchCard: React.FC<MasterSwitchCardProps> = ({
                     </span>
                     <Switch
                       checked={!!customSwitch.isActive}
-                      onCheckedChange={(checked) => handleToggleCustomSwitch(customSwitch.id, checked)}
+                      onCheckedChange={async (checked) => {
+                        const offlineDevices = customSwitch.switches.filter(sid => {
+                          const [deviceId] = sid.split('-');
+                          const device = devices.find(d => d.id === deviceId);
+                          return device && device.status !== 'online';
+                        });
+                        const onlineDevices = customSwitch.switches.filter(sid => {
+                          const [deviceId] = sid.split('-');
+                          const device = devices.find(d => d.id === deviceId);
+                          return device && device.status === 'online';
+                        });
+                        if (offlineDevices.length > 0) {
+                          toast({
+                            title: 'Some Devices Offline',
+                            description: `Offline: ${offlineDevices.map(sid => {
+                              const [deviceId] = sid.split('-');
+                              const device = devices.find(d => d.id === deviceId);
+                              return device?.name || deviceId;
+                            }).join(', ')}`,
+                            variant: 'destructive'
+                          });
+                        }
+                        if (onlineDevices.length > 0) {
+                          // Only toggle online devices
+                          await toggleOnlineDevicesInCustomSwitch(customSwitch.id, checked, onlineDevices);
+                        }
+                      }}
                     />
                   </div>
                 </CardContent>
@@ -286,31 +344,93 @@ export const MasterSwitchCard: React.FC<MasterSwitchCardProps> = ({
 
             <div>
               <Label>Select Switches to Control</Label>
-              <div className="max-h-60 overflow-y-auto border rounded-md p-2 mt-2">
-                {allSwitches.map((switch_) => (
-                  <div key={switch_.id} className="flex items-center space-x-2 py-2">
-                    <Checkbox
-                      id={switch_.id}
-                      checked={newSwitch.selectedSwitches.includes(switch_.id)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setNewSwitch({
-                            ...newSwitch,
-                            selectedSwitches: [...newSwitch.selectedSwitches, switch_.id]
-                          });
-                        } else {
-                          setNewSwitch({
-                            ...newSwitch,
-                            selectedSwitches: newSwitch.selectedSwitches.filter(id => id !== switch_.id)
-                          });
-                        }
-                      }}
-                    />
-                    <Label htmlFor={switch_.id} className="text-sm">
-                      {switch_.name}
-                    </Label>
-                  </div>
-                ))}
+              <Input
+                className="mt-2 mb-2"
+                placeholder="Search switches..."
+                value={newSwitch._search || ''}
+                onChange={e => setNewSwitch({ ...newSwitch, _search: e.target.value })}
+              />
+              <div className="flex gap-2 mb-2">
+                <select
+                  className="border rounded px-2 py-1 text-sm bg-background"
+                  value={newSwitch._classroom || ''}
+                  onChange={e => setNewSwitch({ ...newSwitch, _classroom: e.target.value })}
+                >
+                  <option value="">Select Classroom</option>
+                  {[...new Set(allSwitches.map(sw => sw.name.split(' - ')[0]))].map(classroom => (
+                    <option key={classroom} value={classroom}>{classroom}</option>
+                  ))}
+                </select>
+                <select
+                  className="border rounded px-2 py-1 text-sm bg-background"
+                  value={newSwitch._type || ''}
+                  onChange={e => setNewSwitch({ ...newSwitch, _type: e.target.value })}
+                >
+                  <option value="">Select Type</option>
+                  {[...new Set(devices.flatMap(d => d.switches.map(sw => sw.type)))].map(type => (
+                    <option key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1)}</option>
+                  ))}
+                </select>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="checkbox"
+                    id="select-all-switches"
+                    checked={(() => {
+                      const filtered = allSwitches
+                        .filter(sw => !newSwitch._search || sw.name.toLowerCase().includes(newSwitch._search.toLowerCase()))
+                        .filter(sw => !newSwitch._classroom || sw.name.split(' - ')[0] === newSwitch._classroom)
+                        .filter(sw => !newSwitch._type || devices.find(d => d.id === sw.deviceId)?.switches.find(s => s.id === sw.switchId)?.type === newSwitch._type);
+                      return filtered.length > 0 && filtered.every(sw => newSwitch.selectedSwitches.includes(sw.id));
+                    })()}
+                    onChange={e => {
+                      const filtered = allSwitches
+                        .filter(sw => !newSwitch._search || sw.name.toLowerCase().includes(newSwitch._search.toLowerCase()))
+                        .filter(sw => !newSwitch._classroom || sw.name.split(' - ')[0] === newSwitch._classroom)
+                        .filter(sw => !newSwitch._type || devices.find(d => d.id === sw.deviceId)?.switches.find(s => s.id === sw.switchId)?.type === newSwitch._type);
+                      if (e.target.checked) {
+                        setNewSwitch({ ...newSwitch, selectedSwitches: Array.from(new Set([...newSwitch.selectedSwitches, ...filtered.map(sw => sw.id)])) });
+                      } else {
+                        setNewSwitch({ ...newSwitch, selectedSwitches: newSwitch.selectedSwitches.filter(id => !filtered.map(sw => sw.id).includes(id)) });
+                      }
+                    }}
+                  />
+                  <Label htmlFor="select-all-switches" className="text-xs cursor-pointer">Select All</Label>
+                </div>
+              </div>
+              <div className="max-h-60 overflow-y-auto border rounded-md p-2">
+                {allSwitches
+                  .filter(sw => !newSwitch._search || sw.name.toLowerCase().includes(newSwitch._search.toLowerCase()))
+                  .filter(sw => !newSwitch._classroom || sw.name.split(' - ')[0] === newSwitch._classroom)
+                  .filter(sw => {
+                    if (!newSwitch._type) return true;
+                    const device = devices.find(d => d.id === sw.deviceId);
+                    const switchObj = device?.switches.find(s => s.id === sw.switchId);
+                    return switchObj?.type === newSwitch._type;
+                  })
+                  .map((switch_) => (
+                    <div key={switch_.id} className="flex items-center space-x-2 py-2">
+                      <Checkbox
+                        id={switch_.id}
+                        checked={newSwitch.selectedSwitches.includes(switch_.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setNewSwitch({
+                              ...newSwitch,
+                              selectedSwitches: [...newSwitch.selectedSwitches, switch_.id]
+                            });
+                          } else {
+                            setNewSwitch({
+                              ...newSwitch,
+                              selectedSwitches: newSwitch.selectedSwitches.filter(id => id !== switch_.id)
+                            });
+                          }
+                        }}
+                      />
+                      <Label htmlFor={switch_.id} className="text-sm">
+                        {switch_.name}
+                      </Label>
+                    </div>
+                  ))}
               </div>
             </div>
 

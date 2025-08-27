@@ -11,8 +11,31 @@ interface CustomMasterSwitch {
 }
 
 export const useCustomMasterSwitches = () => {
+  // Toggle only online devices in a custom switch group
+  const toggleOnlineDevicesInCustomSwitch = async (customSwitchId: string, state: boolean, onlineSwitchIds: string[]) => {
+    const customSwitch = customSwitches.find(sw => sw.id === customSwitchId);
+    if (!customSwitch) return;
+    for (const switchRef of onlineSwitchIds) {
+      const [deviceId, switchId] = switchRef.split('-');
+      await toggleSwitch(deviceId, switchId);
+    }
+    setCustomSwitches(prev => {
+      const updated = prev.map(sw =>
+        sw.id === customSwitchId ? { ...sw, isActive: state } : sw
+      );
+      localStorage.setItem('customMasterSwitches', JSON.stringify(updated));
+      return updated;
+    });
+  };
   const { devices, toggleSwitch } = useDevices();
-  const [customSwitches, setCustomSwitches] = useState<CustomMasterSwitch[]>([]);
+  const [customSwitches, setCustomSwitches] = useState<CustomMasterSwitch[]>(() => {
+    try {
+      const saved = localStorage.getItem('customMasterSwitches');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
 
   const addCustomSwitch = (switchData: Omit<CustomMasterSwitch, 'id' | 'isActive'>) => {
     const newSwitch: CustomMasterSwitch = {
@@ -20,11 +43,19 @@ export const useCustomMasterSwitches = () => {
       isActive: false,
       ...switchData
     };
-    setCustomSwitches(prev => [...prev, newSwitch]);
+    setCustomSwitches(prev => {
+      const updated = [...prev, newSwitch];
+      localStorage.setItem('customMasterSwitches', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const deleteCustomSwitch = (switchId: string) => {
-    setCustomSwitches(prev => prev.filter(sw => sw.id !== switchId));
+    setCustomSwitches(prev => {
+      const updated = prev.filter(sw => sw.id !== switchId);
+      localStorage.setItem('customMasterSwitches', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const toggleCustomSwitch = async (customSwitchId: string, state: boolean) => {
@@ -38,17 +69,19 @@ export const useCustomMasterSwitches = () => {
     }
 
     // Update the custom switch state
-    setCustomSwitches(prev =>
-      prev.map(sw =>
+    setCustomSwitches(prev => {
+      const updated = prev.map(sw =>
         sw.id === customSwitchId ? { ...sw, isActive: state } : sw
-      )
-    );
+      );
+      localStorage.setItem('customMasterSwitches', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   // Update isActive state based on actual switch states
   const updateCustomSwitchStates = () => {
-    setCustomSwitches(prev =>
-      prev.map(customSwitch => {
+    setCustomSwitches(prev => {
+      const updated = prev.map(customSwitch => {
         const allOn = customSwitch.switches.every(switchRef => {
           const [deviceId, switchId] = switchRef.split('-');
           const device = devices.find(d => d.id === deviceId);
@@ -56,8 +89,10 @@ export const useCustomMasterSwitches = () => {
           return switch_?.state === true;
         });
         return { ...customSwitch, isActive: allOn };
-      })
-    );
+      });
+      localStorage.setItem('customMasterSwitches', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   return {
@@ -65,6 +100,7 @@ export const useCustomMasterSwitches = () => {
     addCustomSwitch,
     deleteCustomSwitch,
     toggleCustomSwitch,
+    toggleOnlineDevicesInCustomSwitch,
     updateCustomSwitchStates
   };
 };

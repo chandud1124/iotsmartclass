@@ -289,7 +289,7 @@ export const DeviceConfigDialog: React.FC<Props> = ({open,onOpenChange,onSubmit,
   {/* Added manualMode/manualActiveLow defaults when adding a new switch */}
   {/* NOTE: Above Add Switch handler updated to include them if needed */}
             </div>
-            <DialogFooter><Button type="submit">Save Changes</Button></DialogFooter>
+            <DialogFooter className="sticky bottom-0 bg-transparent py-4 z-10"><Button type="submit" className="w-full">Save</Button></DialogFooter>
           </form>
         </Form>
       </DialogContent>

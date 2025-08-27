@@ -199,8 +199,8 @@ const Index = () => {
                   key={device.id}
                   device={device}
                   onToggleSwitch={handleToggleSwitch}
-                  onEditDevice={(d)=> setConfigDevice(d.id)}
-                  onDeleteDevice={handleDeleteDevice}
+                  showSwitches={false}
+                  showActions={false}
                 />
               ))}
             </div>

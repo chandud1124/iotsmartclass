@@ -35,228 +35,24 @@ const toSwitchRef = (comboId: string) => {
 };
 const fromSwitchRef = (ref: any): string => `${ref.deviceId}-${ref.switchId}`;
 
-// Google Calendar Connect Component
-function GoogleCalendarConnect({ onConnect }: { onConnect: () => void }) {
-  const [status, setStatus] = useState('Disconnected');
-  const [loading, setLoading] = useState(false);
 
-  const handleConnect = async () => {
-    setLoading(true);
-    setStatus('Connecting...');
+const Schedule: React.FC = () => {
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const handleDeleteSchedule = async (scheduleId: string) => {
     try {
-      const res = await fetch('/api/google-calendar/auth-url'); // keep full fetch since not using api instance (already prefixed)
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        setStatus('Failed to get auth URL');
-      }
-    } catch (err) {
-      setStatus('Failed to connect');
-    }
-    setLoading(false);
-  };
-  return (
-    <div className="mb-4">
-      <p className="mb-2">Google Calendar Connection Status: <b>{status}</b></p>
-      <Button onClick={handleConnect} className="bg-blue-600 hover:bg-blue-700 text-white" disabled={loading}>
-        {loading ? 'Connecting...' : 'Connect Google Calendar'}
-      </Button>
-    </div>
-  );
-}
-
-// Excel Import Component
-function ExcelImport({ onSchedulesExtracted }: { onSchedulesExtracted: (schedules: any[]) => void }) {
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const data = new Uint8Array(evt.target?.result as ArrayBuffer);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const schedules = XLSX.utils.sheet_to_json(sheet);
-      onSchedulesExtracted(schedules);
-    };
-    reader.readAsArrayBuffer(file);
-  };
-  return (
-    <div className="mb-4">
-      <label className="mr-2">Import Schedules from Excel:</label>
-      <input type="file" accept=".xlsx, .xls" onChange={handleFile} />
-    </div>
-  );
-}
-
-function GoogleCalendarPanel() {
-  const [status, setStatus] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [events, setEvents] = useState<any[]>([]);
-
-  const fetchStatus = async () => {
-    try {
-      const res = await api.get('/google-calendar/status');
-      setStatus(res.data);
-    } catch (e) {
-      setStatus({ connected: false });
-    }
-  };
-  useEffect(() => { fetchStatus(); }, []);
-
-  const connect = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/google-calendar/auth-url');
-      const data = await res.json();
-      if (data.url) window.location.href = data.url;
-    } finally { setLoading(false); }
-  };
-
-  const disconnect = async () => {
-    setLoading(true);
-    try {
-      await api.post('/google-calendar/disconnect');
-      setEvents([]);
-      fetchStatus();
-    } finally { setLoading(false); }
-  };
-
-  const loadEvents = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get('/google-calendar/events');
-      setEvents(res.data.events || []);
-    } catch (e) {
-      setEvents([]);
-    } finally { setLoading(false); }
-  };
-
-  return (
-    <Card className="mb-6">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Calendar className="w-4 h-4" /> Google Calendar</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3 text-sm">
-        <div>Status: <span className={status?.connected ? 'text-green-600' : 'text-red-600'}>{status?.connected ? 'Connected' : 'Disconnected'}</span></div>
-        {status?.connected && status.expiresIn != null && (
-          <div>Token expires in: {status.expiresIn}s</div>
-        )}
-        <div className="flex gap-2">
-          {!status?.connected && <Button size="sm" onClick={connect} disabled={loading}>{loading ? '...' : 'Connect'}</Button>}
-          {status?.connected && <Button size="sm" variant="secondary" onClick={loadEvents} disabled={loading}>Load Events</Button>}
-          {status?.connected && <Button size="sm" variant="destructive" onClick={disconnect} disabled={loading}>Disconnect</Button>}
-          <Button size="sm" variant="outline" onClick={fetchStatus} disabled={loading}>Refresh</Button>
-        </div>
-        {events.length > 0 && (
-          <div className="border rounded p-2 max-h-64 overflow-auto text-xs space-y-1">
-            {events.map(ev => (
-              <div key={ev.id} className="border-b pb-1 last:border-0">
-                <div className="font-medium">{ev.summary || '(no title)'}</div>
-                <div className="text-muted-foreground">{ev.start?.dateTime || ev.start?.date} → {ev.end?.dateTime || ev.end?.date}</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-const Schedule = () => {
-  const { toast } = useToast();
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const runScheduleNow = async (scheduleId: string) => {
-    try {
-      await scheduleAPI.runNow(scheduleId);
-      toast({ title: 'Schedule Executed', description: 'Triggered immediately. Check device state.' });
-    } catch (error: any) {
-      console.error('Run-now error:', error);
-      toast({ title: 'Error', description: error.response?.data?.message || error.response?.data?.error || 'Failed to run schedule', variant: 'destructive' });
-    }
-  };
-  
-  useEffect(() => {
-    const fetchSchedules = async () => {
-      try {
-        const response = await api.get('/schedules');
-        if (response.data.success) {
-          const mapped = response.data.data.map((s: any) => ({
-            id: s._id || s.id,
-            name: s.name,
-            time: s.time,
-            action: s.action,
-            // Backend stores numbers; convert to names for UI
-            days: Array.isArray(s.days) ? s.days.map((n: number) => dayNumberToName(n)) : [],
-            // Backend stores objects { deviceId, switchId }; convert to combo ids for UI
-            switches: Array.isArray(s.switches) ? s.switches.map(fromSwitchRef) : [],
-            enabled: s.enabled,
-            timeoutMinutes: s.timeoutMinutes
-          }));
-          setSchedules(mapped);
-        } else {
-          toast({
-            title: "Error",
-            description: "Failed to fetch schedules",
-            variant: "destructive"
-          });
-        }
-      } catch (error) {
-        console.error('Schedule fetch error:', error);
-        toast({
-          title: "Error",
-          description: error.response?.data?.message || error.response?.data?.error || "Failed to fetch schedules",
-          variant: "destructive"
-        });
-      }
-    };
-
-    fetchSchedules();
-  }, [toast]);
-
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
-  const [importedSchedules, setImportedSchedules] = useState<any[]>([]);
-  const [calendarConnected, setCalendarConnected] = useState(false);
-
-  const handleAddSchedule = async (scheduleData: any) => {
-    try {
-      // Map UI payload to backend schema
-      const payload = {
-        name: scheduleData.name,
-        time: scheduleData.time,
-        action: scheduleData.action,
-        type: 'weekly', // UI selects days; treat as weekly schedule
-        days: (scheduleData.days || []).map((d: string) => dayNameToNumber(d)),
-        switches: (scheduleData.switches || []).map((id: string) => toSwitchRef(id)),
-        enabled: true,
-        timeoutMinutes: scheduleData.timeoutMinutes ?? 0
-      };
-      const response = await api.post('/schedules', payload);
+      const response = await api.delete(`/schedules/${scheduleId}`);
       if (response.data.success) {
-        const s = response.data.data;
-        // Normalize server schedule back to UI shape
-        const newSchedule: Schedule = {
-          id: s._id || s.id,
-          name: s.name,
-          time: s.time,
-          action: s.action,
-          days: (s.days || []).map((n: number) => dayNumberToName(n)),
-          switches: (s.switches || []).map(fromSwitchRef),
-          enabled: s.enabled,
-          timeoutMinutes: s.timeoutMinutes
-        };
-        setSchedules(prev => [...prev, newSchedule]);
+        setSchedules(prev => prev.filter(s => s.id !== scheduleId));
         toast({
-          title: "Schedule Added",
-          description: `${scheduleData.name} has been scheduled successfully`
+          title: "Schedule Deleted",
+          description: "Schedule has been removed successfully"
         });
       }
     } catch (error) {
-      console.error('Add schedule error:', error);
+      console.error('Delete schedule error:', error);
       toast({
         title: "Error",
-        description: error.response?.data?.message || error.response?.data?.error || "Failed to add schedule",
+        description: error.response?.data?.message || "Failed to delete schedule",
         variant: "destructive"
       });
     }
@@ -264,7 +60,6 @@ const Schedule = () => {
 
   const handleEditSchedule = async (scheduleData: any) => {
     if (!editingSchedule) return;
-    
     try {
       const payload = {
         name: scheduleData.name,
@@ -312,23 +107,93 @@ const Schedule = () => {
     }
   };
 
-  const handleDeleteSchedule = async (scheduleId: string) => {
+  const handleAddSchedule = async (scheduleData: any) => {
     try {
-  const response = await api.delete(`/schedules/${scheduleId}`);
+      const payload = {
+        name: scheduleData.name,
+        time: scheduleData.time,
+        action: scheduleData.action,
+        type: 'weekly',
+        days: (scheduleData.days || []).map((d: string) => dayNameToNumber(d)),
+        switches: (scheduleData.switches || []).map((id: string) => toSwitchRef(id)),
+        enabled: true,
+        timeoutMinutes: scheduleData.timeoutMinutes ?? 0
+      };
+      const response = await api.post('/schedules', payload);
       if (response.data.success) {
-        setSchedules(prev => prev.filter(s => s.id !== scheduleId));
+        const s = response.data.data;
+        const newSchedule: Schedule = {
+          id: s._id || s.id,
+          name: s.name,
+          time: s.time,
+          action: s.action,
+          days: (s.days || []).map((n: number) => dayNumberToName(n)),
+          switches: (s.switches || []).map(fromSwitchRef),
+          enabled: s.enabled,
+          timeoutMinutes: s.timeoutMinutes
+        };
+        setSchedules(prev => [...prev, newSchedule]);
         toast({
-          title: "Schedule Deleted",
-          description: "Schedule has been removed successfully"
+          title: "Schedule Added",
+          description: `${scheduleData.name} has been scheduled successfully`
         });
       }
     } catch (error) {
-      console.error('Delete schedule error:', error);
+      console.error('Add schedule error:', error);
       toast({
         title: "Error",
-        description: error.response?.data?.message || "Failed to delete schedule",
+        description: error.response?.data?.message || error.response?.data?.error || "Failed to add schedule",
         variant: "destructive"
       });
+    }
+  };
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchSchedules = async () => {
+      try {
+        const response = await api.get('/schedules');
+        if (response.data.success) {
+          const mapped = response.data.data.map((s: any) => ({
+            id: s._id || s.id,
+            name: s.name,
+            time: s.time,
+            action: s.action,
+            days: Array.isArray(s.days) ? s.days.map((n: number) => dayNumberToName(n)) : [],
+            switches: Array.isArray(s.switches) ? s.switches.map(fromSwitchRef) : [],
+            enabled: s.enabled,
+            timeoutMinutes: s.timeoutMinutes
+          }));
+          setSchedules(mapped);
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to fetch schedules",
+            variant: "destructive"
+          });
+        }
+      } catch (error) {
+        console.error('Schedule fetch error:', error);
+        toast({
+          title: "Error",
+          description: error.response?.data?.message || error.response?.data?.error || "Failed to fetch schedules",
+          variant: "destructive"
+        });
+      }
+    };
+    fetchSchedules();
+  }, [toast]);
+
+  const runScheduleNow = async (scheduleId: string) => {
+    try {
+      await scheduleAPI.runNow(scheduleId);
+      toast({ title: 'Schedule Executed', description: 'Triggered immediately. Check device state.' });
+    } catch (error: any) {
+      console.error('Run-now error:', error);
+      toast({ title: 'Error', description: error.response?.data?.message || error.response?.data?.error || 'Failed to run schedule', variant: 'destructive' });
     }
   };
 
@@ -348,63 +213,20 @@ const Schedule = () => {
   };
 
   return (
-      <div className="space-y-6">
-        {/* Google Calendar Integration */}
-        <GoogleCalendarPanel />
-
-        {/* Excel Import */}
-        <ExcelImport onSchedulesExtracted={setImportedSchedules} />
-
-        {/* Show imported schedules and allow adding them */}
-        {importedSchedules.length > 0 && (
-          <div className="mb-4">
-            <h4 className="font-semibold">Imported Schedules Preview</h4>
-            <pre className="bg-muted p-2 rounded max-h-48 overflow-auto text-xs">{JSON.stringify(importedSchedules, null, 2)}</pre>
-            <Button
-              className="mt-2 bg-green-600 hover:bg-green-700 text-white"
-              onClick={() => {
-                // Convert imported schedules to Schedule type and merge
-                const converted = importedSchedules.map((item, idx) => {
-                  let actionRaw = (item.action || item.Action || 'on').toString().toLowerCase();
-                  let action: 'on' | 'off' = actionRaw === 'off' ? 'off' : 'on';
-                  return {
-                    id: `imported-${Date.now()}-${idx}`,
-                    name: item.name || item.Name || `Imported Schedule ${idx + 1}`,
-                    time: item.time || item.Time || '09:00',
-                    action,
-                    days: (item.days || item.Days || 'Monday,Tuesday,Wednesday,Thursday,Friday').split(',').map((d: string) => d.trim()),
-                    switches: (item.switches || item.Switches || '').split(',').map((s: string) => s.trim()).filter(Boolean),
-                    enabled: true,
-                    timeoutMinutes: Number(item.timeoutMinutes || item.TimeoutMinutes || 0)
-                  } as Schedule;
-                });
-                setSchedules(prev => [...prev, ...converted]);
-                setImportedSchedules([]);
-                toast({
-                  title: 'Imported Schedules Added',
-                  description: `${converted.length} schedule(s) imported and added.`
-                });
-              }}
-            >
-              Add Imported Schedules
-            </Button>
-          </div>
-        )}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">
-              Schedule Management
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Automate classroom lighting and devices with smart scheduling
-            </p>
-          </div>
-          <Button onClick={() => setDialogOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Schedule
-          </Button>
+    <>
+      {/* Top Bar / Toolbar */}
+      <div className="flex items-center justify-between py-4 px-2 bg-background border-b mb-6">
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold text-foreground">Schedule Management</h1>
+          <span className="text-muted-foreground text-sm">Automate classroom lighting and devices</span>
         </div>
-
+        <Button onClick={() => setDialogOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Add Schedule
+        </Button>
+      </div>
+      {/* Main Content */}
+      <div className="space-y-6">
         {schedules.length === 0 ? (
           <div className="text-center py-12">
             <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -499,10 +321,33 @@ const Schedule = () => {
                       <Button
                         size="sm"
                         variant="destructive"
-                        onClick={() => handleDeleteSchedule(schedule.id)}
+                        onClick={() => setConfirmDeleteId(schedule.id)}
                       >
                         <Trash2 className="w-3 h-3" />
                       </Button>
+      {/* Confirm Delete Schedule Dialog */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm">
+            <h3 className="text-lg font-semibold mb-2">Delete Schedule</h3>
+            <p className="mb-4">Are you sure you want to delete this schedule? This action cannot be undone.</p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  await handleDeleteSchedule(confirmDeleteId);
+                  setConfirmDeleteId(null);
+                }}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
                     </div>
                   </div>
                 </CardContent>
@@ -521,6 +366,7 @@ const Schedule = () => {
           schedule={editingSchedule}
         />
       </div>
+    </>
   );
 };
 

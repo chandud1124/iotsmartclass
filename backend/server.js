@@ -123,11 +123,12 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
     // Allow all LAN origins for development
     const devOrigins = [
-      'http://localhost:5173',
-      'http://localhost:5174',
-      'http://localhost:5175',
-      `http://${require('os').networkInterfaces()['en0']?.find(i=>i.family==='IPv4')?.address}:5173`, // Mac WiFi
-      `http://${require('os').networkInterfaces()['eth0']?.find(i=>i.family==='IPv4')?.address}:5173`, // Ethernet
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  `http://${require('os').networkInterfaces()['en0']?.find(i=>i.family==='IPv4')?.address}:5173`, // Mac WiFi
+  `http://${require('os').networkInterfaces()['eth0']?.find(i=>i.family==='IPv4')?.address}:5173`, // Ethernet
+  'http://192.168.1.100:5173', // Example extra network host
       '*'
     ];
     const allowedOrigins = process.env.NODE_ENV === 'production'
@@ -156,6 +157,9 @@ app.use(cors({
       'http://localhost:5174',
       'http://localhost:5175',
       'https://8fhvp51m-5173.inc1.devtunnels.ms', // Dev tunnel origin
+      'http://192.168.1.100:5173', // Example extra network host
+      'http://192.168.0.108:5173', // New IP for your network
+      // Add more static IPs/hosts here as needed
     ];
     // Dynamically add LAN IPs
     const os = require('os');
@@ -756,8 +760,8 @@ app.use('*', (req, res) => {
 
 // Start the server (single attempt)
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT} (accessible on any network interface)`);
   console.log(`Environment: ${process.env.NODE_ENV}`);
 });
 

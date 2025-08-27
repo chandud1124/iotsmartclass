@@ -6,22 +6,19 @@ class SocketService {
   private listeners: Map<string, Set<Function>> = new Map();
 
   constructor() {
-  const RAW_SOCKET_URL = import.meta.env.VITE_API_BASE_URL || 'http://172.16.3.56:3001';
-    // If env base includes /api (used for REST), strip it for Socket.IO root namespace
+    // Use backend IP and port, strip /api for socket connection
+  const RAW_SOCKET_URL = import.meta.env.VITE_WEBSOCKET_URL || 'http://192.168.0.108:3001';
     let derived = RAW_SOCKET_URL.replace(/\/$/, '');
     if (/\/api$/.test(derived)) {
       derived = derived.replace(/\/api$/, '');
     }
-    const SOCKET_URL = derived.includes('30011')
-      ? derived.replace('30011', '3001')
-      : derived;
+    const SOCKET_URL = derived;
     if (SOCKET_URL !== RAW_SOCKET_URL) {
       // eslint-disable-next-line no-console
       console.warn('[socket] Overriding outdated socket URL', RAW_SOCKET_URL, '->', SOCKET_URL);
     }
-    
-  // Connect to base namespace now that /test service removed
-  this.socket = io(`${SOCKET_URL}`, {
+    // Connect to base namespace
+    this.socket = io(`${SOCKET_URL}`, {
       transports: ['polling'],
       autoConnect: true,
       reconnection: true,

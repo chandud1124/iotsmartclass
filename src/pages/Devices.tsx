@@ -5,10 +5,13 @@ import { Plus } from 'lucide-react';
 import { useDevices } from '@/hooks/useDevices';
 import { useToast } from '@/hooks/use-toast';
 import { DeviceConfigDialog } from '@/components/DeviceConfigDialog';
+import DeleteDeviceDialog from '@/components/DeleteDeviceDialog';
 import { Device } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 
 const Devices = () => {
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deletingDeviceId, setDeletingDeviceId] = useState<string | null>(null);
   const { devices, toggleSwitch, updateDevice, deleteDevice, addDevice } = useDevices();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -50,12 +53,20 @@ const Devices = () => {
   };
 
   const handleDeleteDevice = async (deviceId: string) => {
+    setDeletingDeviceId(deviceId);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDeleteDevice = async () => {
+    if (!deletingDeviceId) return;
     try {
-      await deleteDevice(deviceId);
+      await deleteDevice(deletingDeviceId);
       toast({
         title: "Success",
         description: "Device deleted successfully"
       });
+      setShowDeleteDialog(false);
+      setDeletingDeviceId(null);
     } catch (error) {
       toast({
         title: "Error",
@@ -87,86 +98,100 @@ const Devices = () => {
   }
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Devices</h1>
+    <>
+      <DeleteDeviceDialog
+        open={showDeleteDialog}
+        onOpenChange={(open) => { setShowDeleteDialog(open); if (!open) setDeletingDeviceId(null); }}
+        onConfirm={confirmDeleteDevice}
+        loading={false}
+        deviceName={devices.find(d => d.id === deletingDeviceId)?.name || ''}
+      />
+      <div className="container mx-auto py-6">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold">Devices</h1>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {devices.map((device) => (
+            <DeviceCard
+              key={device.id}
+              device={device}
+              onToggleSwitch={handleToggleSwitch}
+              onEditDevice={isAdmin ? (d) => { setSelectedDevice(d); setShowConfigDialog(true); } : undefined}
+              onDeleteDevice={isAdmin ? handleDeleteDevice : undefined}
+            />
+          ))}
+        </div>
+
+        {/* Fixed Add Device Button for Admins */}
+        {isAdmin && !(showConfigDialog && !selectedDevice) && !selectedDevice && (
+          <div style={{position: 'fixed', bottom: '32px', right: '32px', zIndex: 100}}>
+            <Button
+              size="lg"
+              variant="default"
+              onClick={() => {
+                setSelectedDevice(undefined);
+                setShowConfigDialog(true);
+              }}
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              Add Device
+            </Button>
+          </div>
+        )}
+
         {isAdmin && (
-          <Button
-            onClick={() => {
-              setSelectedDevice(undefined);
-              setShowConfigDialog(true);
+          <DeviceConfigDialog
+            open={showConfigDialog}
+            onOpenChange={setShowConfigDialog}
+            onSubmit={(data) => {
+              if (selectedDevice) {
+                handleUpdateDevice(selectedDevice.id, {
+                  ...data,
+                  switches: data.switches.map(sw => {
+                    const existing = selectedDevice.switches.find(s => s.id === (sw as any).id) || selectedDevice.switches.find(s => s.name === sw.name);
+                    return {
+                      id: (sw as any).id || existing?.id || `switch-${Date.now()}-${Math.random()}`,
+                      name: sw.name || existing?.name || 'Unnamed Switch',
+                      type: sw.type || existing?.type || 'relay',
+                      gpio: (sw as any).gpio ?? (sw as any).relayGpio ?? existing?.gpio ?? existing?.relayGpio ?? 0,
+                      relayGpio: (sw as any).relayGpio ?? (sw as any).gpio ?? existing?.relayGpio ?? existing?.gpio ?? 0,
+                      state: (sw as any).state !== undefined ? (sw as any).state : (existing?.state ?? false),
+                      manualSwitchEnabled: sw.manualSwitchEnabled ?? existing?.manualSwitchEnabled ?? false,
+                      manualSwitchGpio: sw.manualSwitchGpio !== undefined ? sw.manualSwitchGpio : existing?.manualSwitchGpio,
+                      usePir: existing?.usePir || false,
+                      dontAutoOff: existing?.dontAutoOff || false,
+                      manualMode: (sw as any).manualMode || existing?.manualMode || 'maintained',
+                      manualActiveLow: (sw as any).manualActiveLow !== undefined ? (sw as any).manualActiveLow : (existing?.manualActiveLow ?? true)
+                    };
+                  })
+                });
+              } else {
+                handleAddDevice({
+                  ...data,
+                  id: `device-${Date.now()}`,
+                  status: 'offline',
+                  lastSeen: new Date(),
+                  switches: data.switches.map((sw, idx) => ({
+                    id: `switch-${Date.now()}-${idx}`,
+                    name: sw.name || 'Unnamed Switch',
+                    type: sw.type || 'relay',
+                    gpio: (sw as any).gpio ?? (sw as any).relayGpio ?? 0,
+                    relayGpio: (sw as any).relayGpio ?? (sw as any).gpio ?? 0,
+                    state: false,
+                    manualSwitchEnabled: sw.manualSwitchEnabled || false,
+                    manualSwitchGpio: sw.manualSwitchGpio,
+                    usePir: false,
+                    dontAutoOff: false,
+                  }))
+                } as Device);
+              }
             }}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Device
-          </Button>
+            initialData={selectedDevice}
+          />
         )}
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-    {devices.map((device) => (
-          <DeviceCard
-            key={device.id}
-            device={device}
-      onToggleSwitch={handleToggleSwitch}
-      onEditDevice={isAdmin ? (d) => { setSelectedDevice(d); setShowConfigDialog(true); } : undefined}
-      onDeleteDevice={isAdmin ? handleDeleteDevice : undefined}
-          />
-        ))}
-      </div>
-
-      {isAdmin && (
-        <DeviceConfigDialog
-          open={showConfigDialog}
-          onOpenChange={setShowConfigDialog}
-          onSubmit={(data) => {
-          if (selectedDevice) {
-            handleUpdateDevice(selectedDevice.id, {
-              ...data,
-              switches: data.switches.map(sw => {
-                const existing = selectedDevice.switches.find(s => s.id === (sw as any).id) || selectedDevice.switches.find(s => s.name === sw.name);
-                return {
-                  id: (sw as any).id || existing?.id || `switch-${Date.now()}-${Math.random()}`,
-                  name: sw.name || existing?.name || 'Unnamed Switch',
-                  type: sw.type || existing?.type || 'relay',
-                  // Provide both gpio (for backend model) and relayGpio (for firmware/config payloads)
-                  gpio: (sw as any).gpio ?? (sw as any).relayGpio ?? existing?.gpio ?? existing?.relayGpio ?? 0,
-                  relayGpio: (sw as any).relayGpio ?? (sw as any).gpio ?? existing?.relayGpio ?? existing?.gpio ?? 0,
-                  state: (sw as any).state !== undefined ? (sw as any).state : (existing?.state ?? false),
-                  manualSwitchEnabled: sw.manualSwitchEnabled ?? existing?.manualSwitchEnabled ?? false,
-                  manualSwitchGpio: sw.manualSwitchGpio !== undefined ? sw.manualSwitchGpio : existing?.manualSwitchGpio,
-                  usePir: existing?.usePir || false,
-                  dontAutoOff: existing?.dontAutoOff || false,
-                  manualMode: (sw as any).manualMode || existing?.manualMode || 'maintained',
-                  manualActiveLow: (sw as any).manualActiveLow !== undefined ? (sw as any).manualActiveLow : (existing?.manualActiveLow ?? true)
-                };
-              })
-            });
-          } else {
-            handleAddDevice({
-              ...data,
-              id: `device-${Date.now()}`,
-              status: 'offline',
-              lastSeen: new Date(),
-              switches: data.switches.map((sw, idx) => ({
-                id: `switch-${Date.now()}-${idx}`,
-                name: sw.name || 'Unnamed Switch',
-                type: sw.type || 'relay',
-                gpio: (sw as any).gpio ?? (sw as any).relayGpio ?? 0,
-                relayGpio: (sw as any).relayGpio ?? (sw as any).gpio ?? 0,
-                state: false,
-                manualSwitchEnabled: sw.manualSwitchEnabled || false,
-                manualSwitchGpio: sw.manualSwitchGpio,
-                usePir: false,
-                dontAutoOff: false,
-              }))
-            } as Device);
-          }
-          }}
-          initialData={selectedDevice}
-        />
-      )}
-    </div>
+    </>
   );
 };
 

@@ -16,6 +16,8 @@ interface ScheduleData {
   days: string[];
   switches: string[];
   timeoutMinutes?: number;
+  selectedClassroom?: string;
+  selectedType?: string;
 }
 
 interface ScheduleDialogProps {
@@ -40,36 +42,41 @@ export const ScheduleDialog: React.FC<ScheduleDialogProps> = ({
   
   const [formData, setFormData] = useState<ScheduleData>({
     name: schedule?.name || '',
-    time: schedule?.time || '09:00',
+    time: schedule?.time || '',
     action: schedule?.action || 'on',
     days: schedule?.days || [],
     switches: schedule?.switches || [],
-    timeoutMinutes: schedule?.timeoutMinutes || 480 // 8 hours default for classroom
+    timeoutMinutes: schedule?.timeoutMinutes,
+    selectedClassroom: '',
+    selectedType: ''
   });
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Keep form in sync when editing a schedule
   React.useEffect(() => {
     if (schedule && open) {
       setFormData({
         name: schedule.name || '',
-        time: schedule.time || '09:00',
+  time: schedule.time || '',
         action: schedule.action || 'on',
         days: Array.isArray(schedule.days) ? schedule.days : [],
         switches: Array.isArray(schedule.switches) ? schedule.switches : [],
-        timeoutMinutes: schedule.timeoutMinutes || 480
+  timeoutMinutes: schedule.timeoutMinutes
       });
     } else if (!open && !schedule) {
       // Reset when closing after adding
-      setFormData({ name: '', time: '09:00', action: 'on', days: [], switches: [], timeoutMinutes: 480 });
+  setFormData({ name: '', time: '', action: 'on', days: [], switches: [], timeoutMinutes: undefined });
     }
   }, [schedule, open]);
 
-  const allSwitches = devices.flatMap(device => 
+  const allSwitches = devices.flatMap(device =>
     device.switches.map(sw => ({
       id: `${device.id}-${sw.id}`,
       name: `${sw.name} (${device.name})`,
       deviceName: device.name,
-      location: device.location
+      location: device.location,
+      classroom: device.classroom || 'Other',
+      type: sw.type || 'other'
     }))
   );
 
@@ -158,18 +165,8 @@ export const ScheduleDialog: React.FC<ScheduleDialogProps> = ({
                   <SelectItem value="off">Turn Off</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div>
-              <Label htmlFor="timeout">Auto-off Timeout (minutes)</Label>
-              <Input
-                id="timeout"
-                type="number"
-                value={formData.timeoutMinutes}
-                onChange={(e) => setFormData(prev => ({ ...prev, timeoutMinutes: parseInt(e.target.value) }))}
-                placeholder="480 (8 hours)"
-              />
               <p className="text-xs text-muted-foreground mt-1">
-                Security will be notified if lights run beyond this time
+                Choose whether the schedule should turn the device on or off at the specified time.
               </p>
             </div>
           </div>
@@ -190,25 +187,127 @@ export const ScheduleDialog: React.FC<ScheduleDialogProps> = ({
             </div>
           </div>
 
-          <div>
-            <Label>Select Switches/Devices *</Label>
-            <div className="max-h-40 overflow-y-auto border rounded p-3 mt-2 space-y-2">
-              {allSwitches.map(sw => (
-                <div key={sw.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={sw.id}
-                    checked={formData.switches.includes(sw.id)}
-                    onCheckedChange={(checked) => handleSwitchToggle(sw.id, checked as boolean)}
+            <div>
+              <Label>Select Switches/Devices *</Label>
+              <Input
+                type="text"
+                placeholder="Search devices or switches..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="mb-2"
+              />
+              <div className="flex gap-4 mb-2">
+                <Select onValueChange={selectedClassroom => setFormData(prev => ({ ...prev, selectedClassroom }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Classroom" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[...new Set(allSwitches.map(sw => sw.classroom))].map(classroom => (
+                      <SelectItem key={classroom} value={classroom}>{classroom}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select onValueChange={selectedType => setFormData(prev => ({ ...prev, selectedType }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[...new Set(allSwitches.map(sw => sw.type))].map(type => (
+                      <SelectItem key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Select All checkbox */}
+              <div className="mb-2">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={(() => {
+                      const visibleSwitchIds = Array.from(
+                        allSwitches
+                          .filter(sw =>
+                            (!formData.selectedClassroom || sw.classroom === formData.selectedClassroom) &&
+                            (!formData.selectedType || sw.type === formData.selectedType) &&
+                            (searchTerm === '' || sw.name.toLowerCase().includes(searchTerm.toLowerCase()) || sw.deviceName.toLowerCase().includes(searchTerm.toLowerCase()))
+                          )
+                      ).map(sw => sw.id);
+                      return visibleSwitchIds.length > 0 && visibleSwitchIds.every(id => formData.switches.includes(id));
+                    })()}
+                    onChange={e => {
+                      const visibleSwitchIds = Array.from(
+                        allSwitches
+                          .filter(sw =>
+                            (!formData.selectedClassroom || sw.classroom === formData.selectedClassroom) &&
+                            (!formData.selectedType || sw.type === formData.selectedType) &&
+                            (searchTerm === '' || sw.name.toLowerCase().includes(searchTerm.toLowerCase()) || sw.deviceName.toLowerCase().includes(searchTerm.toLowerCase()))
+                          )
+                      ).map(sw => sw.id);
+                      if (e.target.checked) {
+                        setFormData(prev => ({
+                          ...prev,
+                          switches: Array.from(new Set([...prev.switches, ...visibleSwitchIds]))
+                        }));
+                      } else {
+                        setFormData(prev => ({
+                          ...prev,
+                          switches: prev.switches.filter(id => !visibleSwitchIds.includes(id))
+                        }));
+                      }
+                    }}
                   />
-                  <Label htmlFor={sw.id} className="text-sm flex-1">
-                    {sw.name}
-                    <span className="text-muted-foreground ml-2">({sw.location})</span>
-                  </Label>
-                </div>
-              ))}
+                  <span className="text-sm">Select All</span>
+                </label>
+              </div>
+              {/* Grouped display by classroom and type */}
+              <div className="max-h-40 overflow-y-auto border rounded p-3 mt-2">
+                {Array.from(
+                  allSwitches
+                    .filter(sw =>
+                      (!formData.selectedClassroom || sw.classroom === formData.selectedClassroom) &&
+                      (!formData.selectedType || sw.type === formData.selectedType) &&
+                      (searchTerm === '' || sw.name.toLowerCase().includes(searchTerm.toLowerCase()) || sw.deviceName.toLowerCase().includes(searchTerm.toLowerCase()))
+                    )
+                    .reduce((acc, sw) => {
+                      const key = `${sw.classroom}-${sw.type}`;
+                      if (!acc.has(key)) acc.set(key, []);
+                      acc.get(key).push(sw);
+                      return acc;
+                    }, new Map())
+                ).map(([group, switches]) => (
+                  <div key={group} className="mb-2">
+                    <div className="font-semibold text-xs mb-1">{group.replace('-', ' / ')}</div>
+                    {switches.map(sw => (
+                      <div key={sw.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={sw.id}
+                          checked={formData.switches.includes(sw.id)}
+                          onCheckedChange={(checked) => handleSwitchToggle(sw.id, checked as boolean)}
+                        />
+                        <Label htmlFor={sw.id} className="text-sm flex-1">
+                          {sw.name}
+                          <span className="text-muted-foreground ml-2">({sw.location})</span>
+                        </Label>
+                        <span className={`ml-2 text-xs ${devices.find(d => d.id === sw.id.split('-')[0])?.status === 'online' ? 'text-green-600' : 'text-red-600'}`}>
+                          {devices.find(d => d.id === sw.id.split('-')[0])?.status || 'unknown'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
 
+          {/* Schedule summary preview */}
+          <div className="border rounded p-3 my-4 bg-muted">
+            <div className="font-semibold mb-2">Schedule Preview</div>
+            <div><b>Name:</b> {formData.name}</div>
+            <div><b>Time:</b> {formData.time}</div>
+            <div><b>Action:</b> {formData.action === 'on' ? 'Turn On' : 'Turn Off'}</div>
+            <div><b>Days:</b> {formData.days.join(', ')}</div>
+            <div><b>Devices/Switches:</b> {formData.switches.length}</div>
+            <div><b>Timeout:</b> {formData.timeoutMinutes ? formData.timeoutMinutes + ' min' : 'None'}</div>
+          </div>
           <div className="flex justify-end space-x-2 pt-4">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel

@@ -144,9 +144,6 @@ export const Header = () => {
             </div>
           )}
           {/* Google Calendar Connect */}
-          <Button variant="outline" size="sm" onClick={handleGoogleConnect} className="hidden md:inline-flex order-1">
-            <Calendar className="w-4 h-4 mr-1" /> Google Connect
-          </Button>
           {/* Connection Status */}
           <div className="flex items-center gap-2">
             {isConnected ? (
