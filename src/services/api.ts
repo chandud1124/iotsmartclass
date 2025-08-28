@@ -1,22 +1,34 @@
 
+
 import axios from 'axios';
 
-// Default backend port adjusted to 3001 (previous fallback 30011 caused connection errors)
-const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://172.16.3.56:3001/api'; // For REST API
-// Safety: if environment still points to deprecated port 30011, transparently switch to 3001
-const API_BASE_URL = RAW_API_BASE_URL.includes('30011')
-  ? RAW_API_BASE_URL.replace('30011', '3001')
-  : RAW_API_BASE_URL;
+// Auto-detect working API base URL
+const API_URLS = [
+  import.meta.env.VITE_API_BASE_URL,
+  import.meta.env.VITE_API_BASE_URL_EXTRA
+].filter(Boolean);
 
-if (RAW_API_BASE_URL !== API_BASE_URL) {
-  // eslint-disable-next-line no-console
-  console.warn('[api] Overriding outdated API base URL', RAW_API_BASE_URL, '->', API_BASE_URL);
+let detectedApiBaseUrl = API_URLS[0];
+
+export async function detectApiBaseUrl() {
+  for (const url of API_URLS) {
+    try {
+      const res = await fetch(url + '/health');
+      if (res.ok) {
+        detectedApiBaseUrl = url;
+        // eslint-disable-next-line no-console
+        console.info('[api] Using API base URL:', url);
+        return url;
+      }
+    } catch (e) {
+      // Try next
+    }
+  }
+  throw new Error('No working API URL found');
 }
-// eslint-disable-next-line no-console
-console.info('[api] Using API base URL:', API_BASE_URL);
 
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: detectedApiBaseUrl,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -24,13 +36,13 @@ const api = axios.create({
 });
 
 // Helper to get backend origin (strip trailing /api)
-export const getBackendOrigin = () => API_BASE_URL.replace(/\/api\/?$/, '');
+export const getBackendOrigin = () => detectedApiBaseUrl.replace(/\/api\/?$/, '');
 
 // Normalize any accidental double /api prefixes (e.g., request to /api/devices when baseURL already ends with /api)
 api.interceptors.request.use((config) => {
   if (config.url) {
     // Replace leading /api/ with / if baseURL already ends with /api
-    if (API_BASE_URL.endsWith('/api') && config.url.startsWith('/api/')) {
+    if (detectedApiBaseUrl.endsWith('/api') && config.url.startsWith('/api/')) {
       config.url = config.url.replace(/^\/api\//, '/');
     }
     // Guard against resulting // paths
@@ -84,7 +96,7 @@ api.interceptors.response.use(
       try {
         const refreshToken = localStorage.getItem('refresh_token');
         if (refreshToken) {
-          const refreshResp = await axios.post(`${API_BASE_URL}/auth/refresh-token`, { refreshToken });
+          const refreshResp = await axios.post(`${detectedApiBaseUrl}/auth/refresh-token`, { refreshToken });
           if (refreshResp.data?.token) {
             localStorage.setItem('auth_token', refreshResp.data.token);
             api.defaults.headers.common['Authorization'] = `Bearer ${refreshResp.data.token}`;
