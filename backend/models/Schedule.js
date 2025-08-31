@@ -8,12 +8,14 @@ const scheduleSchema = new mongoose.Schema({
   },
   enabled: {
     type: Boolean,
-    default: true
+    default: true,
+    index: true // Index for enabled schedules
   },
   type: {
     type: String,
     enum: ['daily', 'weekly', 'once'],
-    required: true
+    required: true,
+    index: true // Index for schedule type queries
   },
   time: {
     type: String,

@@ -7,93 +7,199 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
-import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Eye, EyeOff, ArrowLeft, Upload, CheckCircle, AlertCircle, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { authAPI } from '@/services/api';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const departments = [
-  'IT Department',
-  'Engineering',
-  'Operations',
-  'Management',
+  'Information Technology',
+  'Computer Science',
+  'Electrical Engineering',
+  'Mechanical Engineering',
+  'Civil Engineering',
+  'Business Administration',
   'Security',
   'Maintenance',
-  'Administration'
+  'Administration',
+  'Library',
+  'Sports',
+  'Other'
+];
+
+const roles = [
+  { value: 'student', label: 'Student', description: 'Access to basic classroom devices and schedules' },
+  { value: 'faculty', label: 'Faculty/Teacher', description: 'Can control devices and request class extensions' },
+  { value: 'hod', label: 'Head of Department', description: 'Department oversight and approval permissions' },
+  { value: 'security', label: 'Security Personnel', description: 'Security monitoring and access control' },
+  { value: 'user', label: 'General Staff', description: 'Limited access to system features' }
 ];
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [currentStep, setCurrentStep] = useState(1);
   const [form, setForm] = useState({
     name: '',
     email: '',
     password: '',
     confirmPassword: '',
+    role: '',
     department: '',
+    employeeId: '',
+    phone: '',
+    designation: '',
+    reason: '',
+    agreeToTerms: false,
+    agreeToPrivacy: false,
+    agreeToDataProcessing: false
   });
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [profilePicture, setProfilePicture] = useState<File | null>(null);
+  const [idDocument, setIdDocument] = useState<File | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Password strength calculation
-  const calculatePasswordStrength = (password: string): number => {
-    let strength = 0;
-    if (password.length >= 8) strength += 25;
-    if (/[A-Z]/.test(password)) strength += 25;
-    if (/[0-9]/.test(password)) strength += 25;
-    if (/[^A-Za-z0-9]/.test(password)) strength += 25;
-    return strength;
+  // Password strength calculation with detailed feedback
+  const calculatePasswordStrength = (password: string) => {
+    const checks = {
+      length: password.length >= 8,
+      uppercase: /[A-Z]/.test(password),
+      lowercase: /[a-z]/.test(password),
+      number: /[0-9]/.test(password),
+      special: /[^A-Za-z0-9]/.test(password)
+    };
+
+    const score = Object.values(checks).filter(Boolean).length;
+    const strength = (score / 5) * 100;
+
+    return {
+      score: strength,
+      checks,
+      label: strength === 100 ? 'Very Strong' :
+        strength >= 80 ? 'Strong' :
+          strength >= 60 ? 'Good' :
+            strength >= 40 ? 'Fair' : 'Weak'
+    };
   };
 
   const passwordStrength = calculatePasswordStrength(form.password);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
+
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
   };
 
-  const validateForm = () => {
-    if (!form.name.trim()) {
-      toast({ title: "Error", description: "Name is required", variant: "destructive" });
-      return false;
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'profile' | 'id') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: 'File Too Large',
+        description: 'Please select a file smaller than 5MB',
+        variant: 'destructive'
+      });
+      return;
     }
-    if (!form.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-      toast({ title: "Error", description: "Invalid email address", variant: "destructive" });
-      return false;
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: 'Invalid File Type',
+        description: 'Please select a JPEG, PNG, or PDF file',
+        variant: 'destructive'
+      });
+      return;
     }
-    if (form.password.length < 8) {
-      toast({ title: "Error", description: "Password must be at least 8 characters", variant: "destructive" });
-      return false;
+
+    if (type === 'profile') {
+      setProfilePicture(file);
+    } else {
+      setIdDocument(file);
     }
-    if (form.password !== form.confirmPassword) {
-      toast({ title: "Error", description: "Passwords do not match", variant: "destructive" });
-      return false;
+  };
+
+  const validateStep = (step: number): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    switch (step) {
+      case 1: // Basic Information
+        if (!form.name.trim()) newErrors.name = 'Full name is required';
+        if (!form.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) newErrors.email = 'Valid email is required';
+        if (!form.role) newErrors.role = 'Please select your role';
+        if (!form.department) newErrors.department = 'Please select your department';
+        break;
+
+      case 2: // Account Security
+        if (form.password.length < 8) newErrors.password = 'Password must be at least 8 characters';
+        if (passwordStrength.score < 60) newErrors.password = 'Password is too weak';
+        if (form.password !== form.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
+        break;
+
+      case 3: // Professional Details
+        if (form.role !== 'student' && !form.employeeId.trim()) newErrors.employeeId = 'Employee ID is required';
+        if (!form.phone.match(/^\+?[\d\s\-\(\)]+$/)) newErrors.phone = 'Valid phone number is required';
+        if (form.role !== 'student' && !form.designation.trim()) newErrors.designation = 'Designation is required';
+        if (!form.reason.trim()) newErrors.reason = 'Please provide a reason for registration';
+        break;
+
+      case 4: // Terms and Documents
+        if (!form.agreeToTerms) newErrors.agreeToTerms = 'You must agree to terms and conditions';
+        if (!form.agreeToPrivacy) newErrors.agreeToPrivacy = 'You must agree to privacy policy';
+        if (!form.agreeToDataProcessing) newErrors.agreeToDataProcessing = 'You must agree to data processing';
+        break;
     }
-    if (!form.department) {
-      toast({ title: "Error", description: "Please select your department", variant: "destructive" });
-      return false;
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const nextStep = () => {
+    if (validateStep(currentStep)) {
+      setCurrentStep(prev => Math.min(prev + 1, 4));
     }
-    if (!agreedToTerms) {
-      toast({ title: "Error", description: "Please agree to terms and conditions", variant: "destructive" });
-      return false;
-    }
-    return true;
+  };
+
+  const prevStep = () => {
+    setCurrentStep(prev => Math.max(prev - 1, 1));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (!validateStep(4)) return;
 
     setLoading(true);
     try {
-      const response = await authAPI.register({
-        name: form.name,
-        email: form.email,
-        password: form.password,
-        role: 'user',
-        department: form.department
+      const formData = new FormData();
+
+      // Add basic form data
+      Object.entries(form).forEach(([key, value]) => {
+        if (key !== 'agreeToTerms' && key !== 'agreeToPrivacy' && key !== 'agreeToDataProcessing') {
+          formData.append(key, value.toString());
+        }
       });
+
+      // Add files
+      if (profilePicture) {
+        formData.append('profilePicture', profilePicture);
+      }
+      if (idDocument) {
+        formData.append('idDocument', idDocument);
+      }
+
+      const response = await authAPI.register(formData);
+
       if (!response.data?.success) {
         toast({
           title: 'Registration Failed',
@@ -102,12 +208,14 @@ const Register: React.FC = () => {
         });
         return;
       }
+
       toast({
         title: 'Registration Successful',
-        description: "Your account is pending admin approval. You'll be redirected to login.",
-        duration: 5000
+        description: "Your account registration has been submitted and is pending admin approval. You'll receive an email notification once reviewed.",
+        duration: 8000
       });
-      setTimeout(() => navigate('/login'), 3000);
+
+      setTimeout(() => navigate('/login'), 5000);
     } catch (err: any) {
       toast({
         title: 'Error',
@@ -118,57 +226,86 @@ const Register: React.FC = () => {
     setLoading(false);
   };
 
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-8 h-8 p-0"
-              onClick={() => navigate('/login')}
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div>
-              <CardTitle>Create an Account</CardTitle>
-              <CardDescription>Sign up for access to IoT device management</CardDescription>
-            </div>
+  const renderStepIndicator = () => (
+    <div className="flex items-center justify-center mb-8">
+      {[1, 2, 3, 4].map((step) => (
+        <div key={step} className="flex items-center">
+          <div className={cn(
+            "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
+            currentStep >= step
+              ? "bg-primary text-primary-foreground"
+              : "bg-muted text-muted-foreground"
+          )}>
+            {currentStep > step ? <CheckCircle className="w-4 h-4" /> : step}
           </div>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {step < 4 && (
+            <div className={cn(
+              "w-12 h-0.5 mx-2",
+              currentStep > step ? "bg-primary" : "bg-muted"
+            )} />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
+              <Label htmlFor="name">Full Name *</Label>
               <Input
                 id="name"
                 name="name"
                 placeholder="John Doe"
                 value={form.name}
                 onChange={handleChange}
-                required
+                className={errors.name ? 'border-red-500' : ''}
               />
+              {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="email">Email Address *</Label>
               <Input
                 id="email"
                 name="email"
                 type="email"
-                placeholder="john@example.com"
+                placeholder="john.doe@university.edu"
                 value={form.email}
                 onChange={handleChange}
-                required
+                className={errors.email ? 'border-red-500' : ''}
               />
+              {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="department">Department</Label>
+              <Label htmlFor="role">Role *</Label>
+              <Select name="role" value={form.role} onValueChange={(value) => setForm(prev => ({ ...prev, role: value }))}>
+                <SelectTrigger className={errors.role ? 'border-red-500' : ''}>
+                  <SelectValue placeholder="Select your role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map((role) => (
+                    <SelectItem key={role.value} value={role.value}>
+                      <div>
+                        <div className="font-medium">{role.label}</div>
+                        <div className="text-sm text-muted-foreground">{role.description}</div>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.role && <p className="text-sm text-red-500">{errors.role}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="department">Department *</Label>
               <Select name="department" value={form.department} onValueChange={(value) => setForm(prev => ({ ...prev, department: value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select department" />
+                <SelectTrigger className={errors.department ? 'border-red-500' : ''}>
+                  <SelectValue placeholder="Select your department" />
                 </SelectTrigger>
                 <SelectContent>
                   {departments.map((dept) => (
@@ -178,19 +315,25 @@ const Register: React.FC = () => {
                   ))}
                 </SelectContent>
               </Select>
+              {errors.department && <p className="text-sm text-red-500">{errors.department}</p>}
             </div>
+          </div>
+        );
 
+      case 2:
+        return (
+          <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">Password *</Label>
               <div className="relative">
                 <Input
                   id="password"
                   name="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
+                  placeholder="Create a strong password"
                   value={form.password}
                   onChange={handleChange}
-                  required
+                  className={errors.password ? 'border-red-500' : ''}
                 />
                 <Button
                   type="button"
@@ -202,23 +345,49 @@ const Register: React.FC = () => {
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
-              <Progress value={passwordStrength} className="h-2" />
-              <p className="text-xs text-muted-foreground mt-1">
-                Password strength: {passwordStrength === 100 ? 'Strong' : passwordStrength >= 50 ? 'Medium' : 'Weak'}
-              </p>
+              <Progress value={passwordStrength.score} className="h-2" />
+              <div className="text-xs text-muted-foreground">
+                <p>Password strength: <span className={cn(
+                  passwordStrength.score >= 80 ? 'text-green-600' :
+                    passwordStrength.score >= 60 ? 'text-yellow-600' : 'text-red-600'
+                )}>{passwordStrength.label}</span></p>
+                <div className="grid grid-cols-2 gap-1 mt-1">
+                  <div className={cn("flex items-center gap-1", passwordStrength.checks.length ? 'text-green-600' : 'text-muted-foreground')}>
+                    {passwordStrength.checks.length ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                    <span className="text-xs">8+ characters</span>
+                  </div>
+                  <div className={cn("flex items-center gap-1", passwordStrength.checks.uppercase ? 'text-green-600' : 'text-muted-foreground')}>
+                    {passwordStrength.checks.uppercase ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                    <span className="text-xs">Uppercase</span>
+                  </div>
+                  <div className={cn("flex items-center gap-1", passwordStrength.checks.lowercase ? 'text-green-600' : 'text-muted-foreground')}>
+                    {passwordStrength.checks.lowercase ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                    <span className="text-xs">Lowercase</span>
+                  </div>
+                  <div className={cn("flex items-center gap-1", passwordStrength.checks.number ? 'text-green-600' : 'text-muted-foreground')}>
+                    {passwordStrength.checks.number ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                    <span className="text-xs">Number</span>
+                  </div>
+                  <div className={cn("flex items-center gap-1", passwordStrength.checks.special ? 'text-green-600' : 'text-muted-foreground')}>
+                    {passwordStrength.checks.special ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                    <span className="text-xs">Special char</span>
+                  </div>
+                </div>
+              </div>
+              {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Label htmlFor="confirmPassword">Confirm Password *</Label>
               <div className="relative">
                 <Input
                   id="confirmPassword"
                   name="confirmPassword"
                   type={showConfirmPassword ? "text" : "password"}
-                  placeholder="••••••••"
+                  placeholder="Confirm your password"
                   value={form.confirmPassword}
                   onChange={handleChange}
-                  required
+                  className={errors.confirmPassword ? 'border-red-500' : ''}
                 />
                 <Button
                   type="button"
@@ -230,27 +399,216 @@ const Register: React.FC = () => {
                   {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
+              {errors.confirmPassword && <p className="text-sm text-red-500">{errors.confirmPassword}</p>}
+            </div>
+          </div>
+        );
+
+      case 3:
+        return (
+          <div className="space-y-4">
+            {form.role !== 'student' && (
+              <div className="space-y-2">
+                <Label htmlFor="employeeId">Employee ID *</Label>
+                <Input
+                  id="employeeId"
+                  name="employeeId"
+                  placeholder="EMP001"
+                  value={form.employeeId}
+                  onChange={handleChange}
+                  className={errors.employeeId ? 'border-red-500' : ''}
+                />
+                {errors.employeeId && <p className="text-sm text-red-500">{errors.employeeId}</p>}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone Number *</Label>
+              <Input
+                id="phone"
+                name="phone"
+                placeholder="+1 (555) 123-4567"
+                value={form.phone}
+                onChange={handleChange}
+                className={errors.phone ? 'border-red-500' : ''}
+              />
+              {errors.phone && <p className="text-sm text-red-500">{errors.phone}</p>}
             </div>
 
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="terms"
-                checked={agreedToTerms}
-                onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)}
+            {form.role !== 'student' && (
+              <div className="space-y-2">
+                <Label htmlFor="designation">Designation *</Label>
+                <Input
+                  id="designation"
+                  name="designation"
+                  placeholder="Assistant Professor"
+                  value={form.designation}
+                  onChange={handleChange}
+                  className={errors.designation ? 'border-red-500' : ''}
+                />
+                {errors.designation && <p className="text-sm text-red-500">{errors.designation}</p>}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="reason">Reason for Registration *</Label>
+              <Textarea
+                id="reason"
+                name="reason"
+                placeholder="Please explain why you need access to the IoT classroom management system..."
+                value={form.reason}
+                onChange={handleChange}
+                className={cn("min-h-[100px]", errors.reason ? 'border-red-500' : '')}
               />
-              <Label
-                htmlFor="terms"
-                className="text-sm text-muted-foreground"
-              >
-                I agree to the terms and conditions
-              </Label>
+              {errors.reason && <p className="text-sm text-red-500">{errors.reason}</p>}
             </div>
+          </div>
+        );
+
+      case 4:
+        return (
+          <div className="space-y-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Profile Picture (Optional)</Label>
+                <div className="flex items-center gap-4">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, 'profile')}
+                    className="hidden"
+                    id="profile-picture"
+                  />
+                  <Label htmlFor="profile-picture" className="flex items-center gap-2 cursor-pointer border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 hover:border-muted-foreground/50 transition-colors">
+                    <Upload className="w-4 h-4" />
+                    <span>{profilePicture ? profilePicture.name : 'Upload profile picture'}</span>
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground">Max 5MB, JPEG/PNG only</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>ID Document (Optional)</Label>
+                <div className="flex items-center gap-4">
+                  <Input
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={(e) => handleFileChange(e, 'id')}
+                    className="hidden"
+                    id="id-document"
+                  />
+                  <Label htmlFor="id-document" className="flex items-center gap-2 cursor-pointer border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 hover:border-muted-foreground/50 transition-colors">
+                    <Upload className="w-4 h-4" />
+                    <span>{idDocument ? idDocument.name : 'Upload ID document'}</span>
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground">Employee ID, Student ID, or Government ID (Max 5MB)</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="terms"
+                  checked={form.agreeToTerms}
+                  onCheckedChange={(checked) => setForm(prev => ({ ...prev, agreeToTerms: checked as boolean }))}
+                />
+                <Label htmlFor="terms" className="text-sm">
+                  I agree to the <Button variant="link" className="p-0 h-auto text-sm">Terms and Conditions</Button>
+                </Label>
+              </div>
+              {errors.agreeToTerms && <p className="text-sm text-red-500">{errors.agreeToTerms}</p>}
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="privacy"
+                  checked={form.agreeToPrivacy}
+                  onCheckedChange={(checked) => setForm(prev => ({ ...prev, agreeToPrivacy: checked as boolean }))}
+                />
+                <Label htmlFor="privacy" className="text-sm">
+                  I agree to the <Button variant="link" className="p-0 h-auto text-sm">Privacy Policy</Button>
+                </Label>
+              </div>
+              {errors.agreeToPrivacy && <p className="text-sm text-red-500">{errors.agreeToPrivacy}</p>}
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="data-processing"
+                  checked={form.agreeToDataProcessing}
+                  onCheckedChange={(checked) => setForm(prev => ({ ...prev, agreeToDataProcessing: checked as boolean }))}
+                />
+                <Label htmlFor="data-processing" className="text-sm">
+                  I consent to the processing of my personal data
+                </Label>
+              </div>
+              {errors.agreeToDataProcessing && <p className="text-sm text-red-500">{errors.agreeToDataProcessing}</p>}
+            </div>
+
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Your registration will be reviewed by an administrator. You will receive an email notification once your account is approved.
+              </AlertDescription>
+            </Alert>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-br from-background to-muted/20">
+      <Card className="w-full max-w-2xl">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-8 h-8 p-0"
+              onClick={() => navigate('/login')}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <CardTitle>Create Your Account</CardTitle>
+              <CardDescription>Step {currentStep} of 4 - Join the IoT Classroom Management System</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent>
+          {renderStepIndicator()}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {renderStepContent()}
           </form>
         </CardContent>
-        <CardFooter>
-          <Button type="submit" disabled={loading || !agreedToTerms} className="w-full" onClick={handleSubmit}>
-            {loading ? 'Creating Account...' : 'Create Account'}
+
+        <CardFooter className="flex justify-between">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={prevStep}
+            disabled={currentStep === 1}
+          >
+            Previous
           </Button>
+
+          {currentStep < 4 ? (
+            <Button type="button" onClick={nextStep}>
+              Next
+            </Button>
+          ) : (
+            <Button
+              type="submit"
+              disabled={loading}
+              onClick={handleSubmit}
+              className="min-w-[120px]"
+            >
+              {loading ? 'Submitting...' : 'Submit Registration'}
+            </Button>
+          )}
         </CardFooter>
       </Card>
     </div>

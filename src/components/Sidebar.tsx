@@ -1,17 +1,20 @@
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Home, 
-  Cpu, 
-  ToggleLeft, 
-  Calendar, 
-  Users, 
-  Settings, 
+import {
+  Home,
+  Cpu,
+  ToggleLeft,
+  Calendar,
+  Users,
+  Settings,
   Shield,
   ChevronLeft,
   ChevronRight,
-  Power
+  Power,
+  User,
+  UserCheck
 } from 'lucide-react';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useAuth } from '@/hooks/useAuth';
 import { useDevices } from '@/hooks/useDevices';
 import { scheduleAPI } from '@/services/api';
@@ -23,11 +26,13 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 const navigation = [
   { name: 'Dashboard', icon: Home, href: '/', current: false },
-  { name: 'Devices', icon: Cpu, href: '/devices', current: false },
-  { name: 'Switches', icon: ToggleLeft, href: '/switches', current: false },
-  { name: 'Master Control', icon: Power, href: '/master', current: false },
-  { name: 'Schedule', icon: Calendar, href: '/schedule', current: false },
-  { name: 'Users', icon: Users, href: '/users', current: false, adminOnly: true },
+  { name: 'Devices', icon: Cpu, href: '/devices', current: false, requiresPermission: 'canManageDevices' },
+  { name: 'Switches', icon: ToggleLeft, href: '/switches', current: false, requiresPermission: 'canManageDevices' },
+  { name: 'Master Control', icon: Power, href: '/master', current: false, requiresPermission: 'canManageDevices' },
+  { name: 'Schedule', icon: Calendar, href: '/schedule', current: false, requiresPermission: 'canManageSchedule' },
+  { name: 'Users', icon: Users, href: '/users', current: false, requiresPermission: 'canManageUsers' },
+  { name: 'Profile', icon: User, href: '/profile', current: false },
+  { name: 'Permissions', icon: UserCheck, href: '/permissions', current: false, requiresPermission: 'canApproveUsers' },
   { name: 'Settings', icon: Settings, href: '/settings', current: false },
 ];
 
@@ -40,8 +45,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigateClose }) 
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isAuthenticated } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const { isAuthenticated } = useAuth();
+  const { isAdmin, hasManagementAccess } = usePermissions();
   const { refreshDevices } = useDevices();
   const { start, stop } = useGlobalLoading();
   const [navLock, setNavLock] = useState(false);
@@ -65,8 +70,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigateClose }) 
       const token = start('nav');
       refreshDevices({ background: true }).finally(() => stop(token));
     }
-  navigate(href);
-  if (onNavigateClose) onNavigateClose();
+    navigate(href);
+    if (onNavigateClose) onNavigateClose();
   };
 
   return (
@@ -93,11 +98,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigateClose }) 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-2">
         {navigation.map((item) => {
-          if (item.adminOnly && !isAdmin) return null;
-          
+          // Permission-based access control
+          if (item.requiresPermission) {
+            const perms = usePermissions();
+            if (!perms[item.requiresPermission as keyof typeof perms]) return null;
+          }
+
           const Icon = item.icon;
           const isCurrentPage = location.pathname === item.href;
-          
+
           return (
             <Button
               key={item.name}

@@ -30,7 +30,8 @@ const switchSchema = new mongoose.Schema({
   },
   state: {
     type: Boolean,
-    default: false
+    default: false,
+    index: true // Index for state queries
   },
   icon: {
     type: String,

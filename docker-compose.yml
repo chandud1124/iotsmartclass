@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:6.0
+    container_name: iot-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: iot-automation
+    volumes:
+      - mongodb_data:/data/db
+      - ./backend/scripts:/docker-entrypoint-initdb.d
+    ports:
+      - "27017:27017"
+    networks:
+      - iot-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: iot-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      MONGODB_URI: mongodb://admin:password123@mongodb:27017/iot-automation?authSource=admin
+      PORT: 3001
+      JWT_SECRET: your-super-secret-jwt-key-change-this-in-production
+    ports:
+      - "3001:3001"
+    depends_on:
+      - mongodb
+    networks:
+      - iot-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: iot-frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_BASE_URL: http://localhost:3001/api
+      VITE_WEBSOCKET_URL: http://localhost:3001
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - iot-network
+
+  # Redis for caching (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: iot-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - iot-network
+
+volumes:
+  mongodb_data:
+
+networks:
+  iot-network:
+    driver: bridge

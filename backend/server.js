@@ -52,7 +52,13 @@ const scheduleService = require('./services/scheduleService');
 const googleCalendarRoutes = require('./routes/googleCalendar');
 
 
-// MongoDB Connection with retry logic and fallback (non-fatal if exhausts)
+// ...existing code...
+
+// --- SOCKET.IO SERVER SETUP ---
+// Remove duplicate setup. Use the main app/server/io instance below.
+// ...existing code...
+
+// --- MongoDB Connection with retry logic and fallback ---
 let dbConnected = false;
 const connectDB = async (retries = 5) => {
   const primaryUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/iot-automation';
@@ -292,6 +298,18 @@ apiRouter.use('/google-calendar', apiLimiter, googleCalendarRoutes);
 apiRouter.use('/calendar', apiLimiter, googleCalendarRoutes); // legacy alias
 
 // Mount all routes under /api
+// Health check endpoint
+app.get('/health', (req, res) => {
+  const health = {
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    database: dbConnected ? 'connected' : 'disconnected',
+    environment: process.env.NODE_ENV || 'development'
+  };
+  res.status(200).json(health);
+});
+
 app.use('/api', apiRouter);
 
 // Optional same-origin static serving (set SERVE_FRONTEND=1 after building frontend into ../dist)
@@ -760,6 +778,12 @@ app.use('*', (req, res) => {
 
 // Start the server (single attempt)
 const PORT = process.env.PORT || 3001;
+if (io && io.opts) {
+  io.opts.cors = {
+    origin: '*', // You can restrict this to your frontend URLs
+    methods: ['GET', 'POST']
+  };
+}
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT} (accessible on any network interface)`);
   console.log(`Environment: ${process.env.NODE_ENV}`);

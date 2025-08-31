@@ -151,7 +151,7 @@ export interface Settings {
 // Settings endpoints (baseURL already ends with /api)
 export const getSettings = () => api.get<Settings>('/settings');
 
-export const updateSettings = (settings: Partial<Settings>) => 
+export const updateSettings = (settings: Partial<Settings>) =>
   api.put<Settings>('/settings', settings);
 
 // (Removed second duplicate response interceptor to prevent double handling / forced reloads)
@@ -170,20 +170,20 @@ export const deviceAPI = {
 
   // New deviceAPI methods
   getAllDevices: () => api.get('/devices'),
-  
+
   createDevice: (deviceData: any) => api.post('/devices', deviceData),
-  
-  updateDevice: (deviceId: string, updates: any) => 
+
+  updateDevice: (deviceId: string, updates: any) =>
     api.put(`/devices/${deviceId}`, updates),
-  
+
   deleteDevice: (deviceId: string) => api.delete(`/devices/${deviceId}`),
-  
+
   toggleSwitch: (deviceId: string, switchId: string, state?: boolean) =>
     api.post(`/devices/${deviceId}/switches/${switchId}/toggle`, { state }),
   bulkToggle: (state: boolean) => api.post('/devices/bulk-toggle', { state }),
   bulkToggleByType: (type: string, state: boolean) => api.post(`/devices/bulk-toggle/type/${type}`, { state }),
   bulkToggleByLocation: (location: string, state: boolean) => api.post(`/devices/bulk-toggle/location/${encodeURIComponent(location)}`, { state }),
-  
+
   getStats: () => api.get('/devices/stats'),
   // Secure admin-only: fetch single device with secret (?includeSecret=1)
   getDeviceWithSecret: (deviceId: string, pin?: string) =>
@@ -192,60 +192,76 @@ export const deviceAPI = {
 
 export const authAPI = {
   // Helper to build auth endpoint without risking double /api
-  _url: (path: string) => `/auth${path}`.replace(/\/{2,}/g,'/'),
+  _url: (path: string) => `/auth${path}`.replace(/\/{2,}/g, '/'),
   login: (credentials: { email: string; password: string }) =>
     api.post('/auth/login', credentials),
-  
-  register: (userData: { name: string; email: string; password: string; role: string; department: string }) =>
+
+  register: (userData: { name: string; email: string; password: string; role: string; department: string; employeeId?: string; phone?: string; designation?: string; reason?: string } | FormData) =>
     api.post('/auth/register', userData),
-  
+
   getProfile: () => api.get('/auth/profile'),
-  
+
   logout: () => api.post('/auth/logout'),
 
-  updateProfile: (data: { 
-    name?: string; 
-    email?: string; 
-    currentPassword?: string; 
+  updateProfile: (data: {
+    name?: string;
+    email?: string;
+    currentPassword?: string;
     newPassword?: string;
   }) => api.put('/auth/profile', data),
 
   deleteAccount: () => api.delete('/auth/profile'),
 
-  forgotPassword: (email: string) => 
+  forgotPassword: (email: string) =>
     api.post('/auth/forgot-password', { email }),
 
   resetPassword: (token: string, newPassword: string) =>
     api.post('/auth/reset-password', { token, newPassword }),
+
+  getPendingPermissionRequests: () => api.get('/auth/permission-requests/pending'),
+
+  approvePermissionRequest: (requestId: string, data: { comments?: string }) =>
+    api.put(`/auth/permission-requests/${requestId}/approve`, data),
+
+  rejectPermissionRequest: (requestId: string, data: { rejectionReason: string; comments?: string }) =>
+    api.put(`/auth/permission-requests/${requestId}/reject`, data),
+
+  getNotifications: (params?: { limit?: number; unreadOnly?: boolean }) =>
+    api.get('/auth/notifications', { params }),
+
+  markNotificationAsRead: (notificationId: string) =>
+    api.put(`/auth/notifications/${notificationId}/read`),
+
+  getUnreadNotificationCount: () => api.get('/auth/notifications/unread-count'),
 };
 
 export const scheduleAPI = {
   getAllSchedules: () => api.get('/schedules'),
-  
+
   createSchedule: (scheduleData: any) => api.post('/schedules', scheduleData),
-  
+
   updateSchedule: (scheduleId: string, updates: any) =>
     api.put(`/schedules/${scheduleId}`, updates),
-  
+
   deleteSchedule: (scheduleId: string) => api.delete(`/schedules/${scheduleId}`),
-  
+
   toggleSchedule: (scheduleId: string) => api.put(`/schedules/${scheduleId}/toggle`),
   runNow: (scheduleId: string) => api.post(`/schedules/${scheduleId}/run`),
 };
 
 export const activityAPI = {
   getActivities: (filters?: any) => api.get('/activities', { params: filters }),
-  
+
   getDeviceActivities: (deviceId: string) => api.get(`/activities/device/${deviceId}`),
-  
+
   getUserActivities: (userId: string) => api.get(`/activities/user/${userId}`),
 };
 
 export const securityAPI = {
   getAlerts: () => api.get('/security/alerts'),
-  
+
   acknowledgeAlert: (alertId: string) => api.put(`/security/alerts/${alertId}/acknowledge`),
-  
+
   createAlert: (alertData: any) => api.post('/security/alerts', alertData),
 };
 

@@ -24,12 +24,7 @@ dist-ssr
 *.sw?
 
 # Environment files
-.env
-.env.local
-.env.production
-backend/.env
-backend/.env.local
-backend/.env.production
+# .env files are now tracked
 # Keep example envs in version control
 !*.env.example
 !.env.example
