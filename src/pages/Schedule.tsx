@@ -5,6 +5,7 @@ import api from '@/services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Calendar, Clock, Plus, Edit, Trash2 } from 'lucide-react';
 import { ScheduleDialog } from '@/components/ScheduleDialog';
 import { scheduleAPI } from '@/services/api';
@@ -84,9 +85,9 @@ const Schedule: React.FC = () => {
           enabled: s.enabled,
           timeoutMinutes: s.timeoutMinutes
         };
-        setSchedules(prev => 
-          prev.map(schedule => 
-            schedule.id === editingSchedule.id 
+        setSchedules(prev =>
+          prev.map(schedule =>
+            schedule.id === editingSchedule.id
               ? updatedSchedule
               : schedule
           )
@@ -325,29 +326,31 @@ const Schedule: React.FC = () => {
                       >
                         <Trash2 className="w-3 h-3" />
                       </Button>
-      {/* Confirm Delete Schedule Dialog */}
-      {confirmDeleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm">
-            <h3 className="text-lg font-semibold mb-2">Delete Schedule</h3>
-            <p className="mb-4">Are you sure you want to delete this schedule? This action cannot be undone.</p>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={async () => {
-                  await handleDeleteSchedule(confirmDeleteId);
-                  setConfirmDeleteId(null);
-                }}
-              >
-                Delete
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+                      {/* Confirm Delete Schedule Dialog */}
+                      <Dialog open={!!confirmDeleteId} onOpenChange={() => setConfirmDeleteId(null)}>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Delete Schedule</DialogTitle>
+                          </DialogHeader>
+                          <p className="text-sm text-muted-foreground">
+                            Are you sure you want to delete this schedule? This action cannot be undone.
+                          </p>
+                          <DialogFooter>
+                            <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>
+                              Cancel
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              onClick={async () => {
+                                await handleDeleteSchedule(confirmDeleteId);
+                                setConfirmDeleteId(null);
+                              }}
+                            >
+                              Delete
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
                     </div>
                   </div>
                 </CardContent>

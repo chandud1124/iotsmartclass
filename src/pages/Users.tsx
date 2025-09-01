@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Users as UsersIcon, Plus, Shield, User, Edit, Trash2, GraduationCap, ShieldCheck, RefreshCcw, Search } from 'lucide-react';
 import { UserDialog } from '@/components/UserDialog';
 import { useToast } from '@/hooks/use-toast';
@@ -201,14 +202,21 @@ const Users = () => {
   const handleDeleteUser = async (userId: string) => {
     try {
       await api.delete(`/users/${userId}`);
+      // Immediately update local state for better UX
       setUsers(prev => prev.filter(u => u.id !== userId));
       toast({ title: 'User Deleted', description: 'User removed successfully' });
-      if (users.length === 1 && page > 1) {
-        setPage(p => p - 1); // move back a page if last item removed
+
+      // Check if we need to adjust page after deletion
+      const currentUsers = users.filter(u => u.id !== userId);
+      if (currentUsers.length === 0 && page > 1) {
+        setPage(p => p - 1);
       } else {
-        fetchUsers();
+        // Refresh data from server to ensure consistency
+        await fetchUsers();
       }
     } catch (error: any) {
+      // If delete failed, refresh data to revert any optimistic updates
+      await fetchUsers();
       toast({ title: 'Error', description: error.response?.data?.message || 'Failed to delete user', variant: 'destructive' });
     }
   };
@@ -436,28 +444,30 @@ const Users = () => {
                       <Trash2 className="w-3 h-3" />
                     </Button>
                     {/* Confirm Delete User Dialog */}
-                    {confirmDeleteId && (
-                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                        <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm">
-                          <h3 className="text-lg font-semibold mb-2">Delete User</h3>
-                          <p className="mb-4">Are you sure you want to delete this user? This action cannot be undone.</p>
-                          <div className="flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>
-                              Cancel
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              onClick={async () => {
-                                await handleDeleteUser(confirmDeleteId);
-                                setConfirmDeleteId(null);
-                              }}
-                            >
-                              Delete
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                    <Dialog open={!!confirmDeleteId} onOpenChange={() => setConfirmDeleteId(null)}>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Delete User</DialogTitle>
+                        </DialogHeader>
+                        <p className="text-sm text-muted-foreground">
+                          Are you sure you want to delete this user? This action cannot be undone.
+                        </p>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>
+                            Cancel
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            onClick={async () => {
+                              await handleDeleteUser(confirmDeleteId);
+                              setConfirmDeleteId(null);
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 </div>
               </CardContent>

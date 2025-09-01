@@ -165,6 +165,9 @@ app.use((req, res, next) => {
       'http://localhost:5173',
       'http://localhost:5174',
       'http://localhost:5175',
+      'http://172.16.3.171:5173', // Windows network IP
+      'http://172.16.3.171:5174', // Windows network IP
+      'http://172.16.3.171:5175', // Windows network IP
       `http://${require('os').networkInterfaces()['en0']?.find(i => i.family === 'IPv4')?.address}:5173`, // Mac WiFi
       `http://${require('os').networkInterfaces()['eth0']?.find(i => i.family === 'IPv4')?.address}:5173`, // Ethernet
       'http://192.168.1.100:5173', // Example extra network host
@@ -827,8 +830,14 @@ if (io && io.opts) {
     methods: ['GET', 'POST']
   };
 }
-server.listen(PORT, '0.0.0.0', () => {
-  logger.info(`Server running on port ${PORT} (accessible on any network interface)`);
+server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
+  const host = process.env.HOST || '0.0.0.0';
+  logger.info(`Server running on ${host}:${PORT}`);
+  if (host === '0.0.0.0') {
+    logger.info(`Server accessible on all network interfaces`);
+  } else {
+    logger.info(`Server bound to specific IP: ${host}`);
+  }
   logger.info(`Environment: ${process.env.NODE_ENV}`);
 });
 

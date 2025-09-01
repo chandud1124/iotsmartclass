@@ -29,12 +29,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     try {
       const response = await authAPI.login({ email, password });
       const { user, token } = response.data;
-      
+
       localStorage.setItem('auth_token', token);
       localStorage.setItem('user_data', JSON.stringify(user));
-      
+
       onLogin(user, token);
-      
+
       toast({
         title: "Login Successful",
         description: `Welcome back, ${user.name}!`
@@ -74,7 +74,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            
+
             <div>
               <Label htmlFor="email">Email</Label>
               <Input
@@ -86,7 +86,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 required
               />
             </div>
-            
+
             <div>
               <Label htmlFor="password">Password</Label>
               <div className="relative">
@@ -101,7 +101,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4" />
@@ -111,7 +111,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 </button>
               </div>
             </div>
-            
+
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? (
                 <>
@@ -123,7 +123,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
               )}
             </Button>
           </form>
-          
+
           <div className="mt-4 p-4 bg-muted rounded-lg">
             <p className="text-sm font-medium mb-2">Default Admin Account:</p>
             <p className="text-xs text-muted-foreground">

@@ -3,6 +3,158 @@
 
 A comprehensive IoT automation system for smart classrooms with real-time device control, scheduling, and monitoring capabilities.
 
+## 🚀 Quick Start - Windows Setup
+
+### Prerequisites
+- **Node.js** (v16 or higher) - [Download from nodejs.org](https://nodejs.org/)
+- **MongoDB Atlas** account (free tier available) - [Create account](https://www.mongodb.com/atlas)
+- **Git** - [Download from git-scm.com](https://git-scm.com/)
+- **Windows 10/11** with network access
+
+### 📥 Installation Steps
+
+1. **Clone the Repository**
+   ```bash
+   git clone https://github.com/chandud1124/iotsmartclass.git
+   cd iotsmartclass
+   ```
+
+2. **Quick Setup (Windows - Recommended)**
+   ```bash
+   # Run the automated setup script
+   .\setup-windows.bat
+   
+   # Or use PowerShell
+   .\setup-windows.ps1
+   ```
+
+3. **Manual Setup (All Platforms)**
+   ```bash
+   # Install frontend dependencies
+   npm install
+   
+   # Install backend dependencies
+   cd backend
+   npm install
+   cd ..
+   ```
+
+4. **Configure Environment Variables**
+
+   **Frontend Configuration** (`.env`):
+   ```env
+   VITE_API_BASE_URL=http://172.16.3.171:3001/api
+   VITE_WEBSOCKET_URL=http://172.16.3.171:3001
+   ```
+
+   **Backend Configuration** (`backend/.env`):
+   ```env
+   NODE_ENV=development
+   PORT=3001
+   HOST=172.16.3.171
+   MONGODB_URI=your_mongodb_connection_string
+   JWT_SECRET=your_jwt_secret_key
+   JWT_EXPIRES_IN=7d
+   ```
+
+5. **IP Address Configuration**
+   If your Windows machine has a different IP address:
+   ```bash
+   # Windows
+   .\configure-ip.bat
+   
+   # Linux/macOS
+   ./configure-ip.sh
+   ```
+
+6. **Update MongoDB Connection**
+   - Get your MongoDB connection string from [MongoDB Atlas](https://cloud.mongodb.com)
+   - Replace `your_mongodb_connection_string` in `backend/.env`
+
+7. **Start the Application**
+
+   **Terminal 1 - Backend Server:**
+   ```bash
+   cd backend
+   npm start
+   ```
+
+   **Terminal 2 - Frontend Development Server:**
+   ```bash
+   npm run dev
+   ```
+
+8. **Access the Application**
+   - **Frontend:** `http://172.16.3.171:5173`
+   - **Backend API:** `http://172.16.3.171:3001/api`
+   - **Health Check:** `http://172.16.3.171:3001/api/health`
+
+### 🔧 Network Configuration
+
+The application is configured to run on IP address `172.16.3.171`. If your Windows machine has a different IP address:
+
+1. Find your IP address:
+   ```bash
+   ipconfig
+   ```
+   Look for "IPv4 Address" under your network adapter.
+
+2. Update the following files with your actual IP:
+   - `.env` - Update `VITE_API_BASE_URL` and `VITE_WEBSOCKET_URL`
+   - `backend/.env` - Update `HOST`
+   - `backend/server.js` - Update CORS origins in `devOrigins` array
+
+### 🐳 Docker Setup (Alternative)
+
+If you prefer using Docker:
+
+```bash
+# Build and run with Docker Compose
+docker-compose up --build
+```
+
+### 📋 System Requirements
+
+- **RAM:** 4GB minimum, 8GB recommended
+- **Storage:** 2GB free space
+- **Network:** Stable internet connection for MongoDB Atlas
+- **Browser:** Chrome 90+, Firefox 88+, Edge 90+
+
+### 🔍 Troubleshooting
+
+**Common Issues:**
+
+1. **Port 3001 already in use:**
+   ```bash
+   # Find process using port 3001
+   netstat -ano | findstr :3001
+   # Kill the process
+   taskkill /PID <PID> /F
+   ```
+
+2. **MongoDB connection failed:**
+   - Check your internet connection
+   - Verify MongoDB Atlas IP whitelist includes your IP
+   - Ensure connection string is correct in `backend/.env`
+
+3. **Frontend not loading:**
+   - Ensure backend is running first
+   - Check that IP addresses match in all configuration files
+   - Try accessing `http://localhost:5173` for local development
+
+4. **CORS errors:**
+   - Verify the IP address in CORS configuration matches your machine's IP
+   - Check that frontend and backend are on the same network
+
+### 📞 Support
+
+For issues or questions:
+- Check the troubleshooting section above
+- Review the error logs in `backend/logs/`
+- Ensure all prerequisites are properly installed
+
+---
+
 ## 🚀 Features
 
 - **Real-time Device Control**: Control lights, fans, projectors, and other devices via WebSocket
@@ -267,6 +419,130 @@ CACHE_TTL=300
    npm install
    npm run dev
    ```
+
+### Windows Setup Instructions
+
+#### Prerequisites for Windows
+- **Node.js 18+**: Download from [nodejs.org](https://nodejs.org/)
+- **MongoDB**: Download from [mongodb.com](https://www.mongodb.com/try/download/community)
+- **Git**: Download from [git-scm.com](https://git-scm.com/)
+- **PowerShell** or **Command Prompt** (built-in)
+
+#### Quick Windows Setup (Automated)
+1. **Run the automated setup script**
+   ```powershell
+   # Option 1: PowerShell (recommended)
+   .\setup-windows.ps1
+
+   # Option 2: Command Prompt
+   setup-windows.bat
+   ```
+
+2. **Configure Environment**
+   ```powershell
+   # Copy Windows environment template
+   copy .env.windows .env
+   copy backend\.env.windows backend\.env
+
+   # Edit the .env files with your MongoDB connection details
+   ```
+
+3. **Start the Application**
+   ```powershell
+   # Start backend
+   cd backend
+   npm start
+
+   # Start frontend (in new terminal)
+   cd ..
+   npm run dev
+   ```
+
+#### Manual Windows Installation Steps
+
+1. **Clone the Repository**
+   ```powershell
+   git clone https://github.com/chandud1124/iotsmartclass.git
+   cd iotsmartclass
+   ```
+
+2. **Database Setup**
+   ```powershell
+   # Option 1: Using MongoDB Community Server
+   # Download and install MongoDB from mongodb.com
+   # Start MongoDB service from Windows Services or:
+   mongod --dbpath "C:\data\db"
+
+   # Option 2: Using Docker (if Docker Desktop is installed)
+   docker run -d -p 27017:27017 --name mongodb mongo:6.0
+   ```
+
+3. **Redis Setup (Optional)**
+   ```powershell
+   # Option 1: Using Docker
+   docker run -d -p 6379:6379 --name redis redis:7-alpine
+
+   # Option 2: Download Redis for Windows
+   # Download from: https://redis.io/download
+   # Extract and run: redis-server.exe
+   ```
+
+4. **Backend Setup**
+   ```powershell
+   cd backend
+   npm install
+
+   # Copy environment file
+   copy .env.example .env
+
+   # Edit .env file with your MongoDB connection string
+   # For local MongoDB: MONGODB_URI=mongodb://localhost:27017/iot_classroom
+   # For MongoDB Atlas: Use your connection string
+
+   # Create initial admin user
+   node scripts/createInitialAdmin.js
+
+   # Start the backend server
+   npm start
+   ```
+
+5. **Frontend Setup**
+   ```powershell
+   # In a new PowerShell window
+   cd ..  # Go back to root directory
+   npm install
+   npm run dev
+   ```
+
+6. **Access the Application**
+   - Frontend: http://localhost:5173
+   - Backend API: http://localhost:3001
+   - MongoDB: localhost:27017
+
+#### Windows Troubleshooting
+
+**Common Issues:**
+- **Port already in use**: Change ports in `.env` files
+- **MongoDB connection error**: Ensure MongoDB is running and connection string is correct
+- **Node modules issues**: Delete `node_modules` and run `npm install` again
+- **Permission errors**: Run PowerShell/Command Prompt as Administrator
+
+**Environment Variables for Windows:**
+```powershell
+# Set environment variables
+$env:NODE_ENV="development"
+$env:PORT="3001"
+$env:MONGODB_URI="mongodb://localhost:27017/iot_classroom"
+```
+
+**Running Multiple Services:**
+```powershell
+# Start backend in background
+Start-Job -ScriptBlock { cd backend; npm start }
+
+# Start frontend in new window
+start powershell { cd frontend; npm run dev }
+```
 
 ### Production Deployment with Scaling
 
@@ -669,6 +945,8 @@ curl -X GET http://localhost:3001/api/devices \
 │   ├── routes/             # API routes
 │   ├── middleware/         # Express middleware
 │   ├── services/           # Business logic
+│   ├── scripts/            # Utility scripts
+│   ├── logs/               # Log files (auto-created)
 │   └── tests/              # Backend tests
 ├── src/                    # React frontend
 │   ├── components/         # Reusable components
@@ -680,6 +958,9 @@ curl -X GET http://localhost:3001/api/devices \
 │   ├── main.cpp            # Main firmware
 │   ├── config.h            # Configuration
 │   └── functions.cpp       # Device functions
+├── .env.windows            # Windows environment template
+├── setup-windows.bat       # Windows batch setup script
+├── setup-windows.ps1       # Windows PowerShell setup script
 └── docker-compose.yml      # Container orchestration
 ```
 

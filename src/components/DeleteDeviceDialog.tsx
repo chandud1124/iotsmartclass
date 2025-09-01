@@ -30,7 +30,7 @@ const DeleteDeviceDialog: React.FC<DeleteDeviceDialogProps> = ({ open, onOpenCha
         >
           <input
             type="text"
-            className="w-full border rounded px-3 py-2 mb-4 bg-white text-black"
+            className="w-full border rounded px-3 py-2 mb-4 bg-background text-foreground placeholder:text-muted-foreground"
             placeholder={`Type '${deviceName}' to confirm`}
             value={inputValue}
             onChange={e => setInputValue(e.target.value)}
