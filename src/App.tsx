@@ -25,6 +25,7 @@ const Login = lazy(() => import("./pages/Login"));
 const Profile = lazy(() => import("./pages/Profile").then(module => ({ default: module.Profile })));
 const PermissionManagement = lazy(() => import("./pages/PermissionManagement"));
 const UserProfile = lazy(() => import("./pages/UserProfile"));
+const ClassroomAccessPage = lazy(() => import("./pages/ClassroomAccessPage"));
 const ForgotPassword = lazy(() => import("./components/ForgotPassword"));
 const ResetPassword = lazy(() => import("./components/ResetPassword"));
 
@@ -83,6 +84,7 @@ const App = () => {
                   <Route path="settings" element={<Settings />} />
                   <Route path="profile" element={<UserProfile />} />
                   <Route path="permissions" element={<PermissionManagement />} />
+                  <Route path="classroom-access" element={<ClassroomAccessPage />} />
                 </Route>
 
                 <Route path="*" element={<NotFound />} />

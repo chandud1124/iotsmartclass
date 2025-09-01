@@ -22,18 +22,20 @@ const toClientUser = (u) => ({
   lastLogin: u.lastLogin
 });
 
-// GET /api/users - list users with optional pagination & search (admin)
+// GET /api/users - list users with optional pagination & search (admin, principal, dean, hod, faculty)
 // Query params: page (1-based), limit, search (matches name/email)
-router.get('/', authorize('admin'), async (req, res) => {
+router.get('/', authorize('admin', 'principal', 'dean', 'hod', 'faculty'), async (req, res) => {
   try {
     const page = Math.max(parseInt(req.query.page) || 1, 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 100);
     const search = (req.query.search || '').toString().trim();
     const filter = search
-      ? { $or: [
+      ? {
+        $or: [
           { name: { $regex: search, $options: 'i' } },
           { email: { $regex: search, $options: 'i' } }
-        ] }
+        ]
+      }
       : {};
 
     const total = await User.countDocuments(filter);
@@ -70,7 +72,7 @@ router.post('/', authorize('admin'), async (req, res) => {
     }
 
     // If no password provided, generate a temporary one and return it so admin can share
-    const tempPassword = password || crypto.randomBytes(5).toString('base64').replace(/[^a-zA-Z0-9]/g,'').slice(0,8);
+    const tempPassword = password || crypto.randomBytes(5).toString('base64').replace(/[^a-zA-Z0-9]/g, '').slice(0, 8);
 
     const user = await User.create({
       name,
@@ -87,7 +89,7 @@ router.post('/', authorize('admin'), async (req, res) => {
     if (!password) {
       response.tempPassword = tempPassword;
       // fire-and-forget email
-      sendTempPasswordEmail(email, tempPassword).catch(()=>{});
+      sendTempPasswordEmail(email, tempPassword).catch(() => { });
     }
     res.status(201).json(response);
   } catch (error) {
@@ -113,7 +115,7 @@ router.patch('/me/password', async (req, res) => {
     user.password = newPassword;
     user.firstLoginResetRequired = false;
     await user.save();
-    sendPasswordChangedEmail(user.email).catch(()=>{});
+    sendPasswordChangedEmail(user.email).catch(() => { });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ message: 'Error changing password' });
@@ -133,7 +135,7 @@ router.get('/me/flags', async (req, res) => {
 const objectIdPattern = '([0-9a-fA-F]{24})';
 
 // GET single user (admin)
-router.get('/:id('+objectIdPattern+')', authorize('admin'), async (req, res) => {
+router.get('/:id(' + objectIdPattern + ')', authorize('admin'), async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select('-password');
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -144,9 +146,9 @@ router.get('/:id('+objectIdPattern+')', authorize('admin'), async (req, res) => 
 });
 
 // PUT /api/users/:id - replace/update user (admin)
-router.put('/:id('+objectIdPattern+')', authorize('admin'), async (req, res) => {
+router.put('/:id(' + objectIdPattern + ')', authorize('admin'), async (req, res) => {
   try {
-  const allowed = ['name','email','role','department','accessLevel','assignedDevices','isActive'];
+    const allowed = ['name', 'email', 'role', 'department', 'accessLevel', 'assignedDevices', 'isActive'];
     const update = {};
     allowed.forEach(f => { if (req.body[f] !== undefined) update[f] = req.body[f]; });
 
@@ -161,7 +163,7 @@ router.put('/:id('+objectIdPattern+')', authorize('admin'), async (req, res) => 
       }
     }
 
-  const user = await User.findByIdAndUpdate(req.params.id, update, { new: true }).select('-password');
+    const user = await User.findByIdAndUpdate(req.params.id, update, { new: true }).select('-password');
     if (!user) return res.status(404).json({ message: 'User not found' });
     if (process.env.NODE_ENV !== 'production') {
       console.log('[users:update] updated', req.params.id, update);
@@ -174,14 +176,14 @@ router.put('/:id('+objectIdPattern+')', authorize('admin'), async (req, res) => 
 });
 
 // PATCH /api/users/:id/status - toggle active status (admin) (cannot deactivate self)
-router.options('/:id('+objectIdPattern+')/status', (req, res) => {
+router.options('/:id(' + objectIdPattern + ')/status', (req, res) => {
   // Ensure PATCH explicitly present for preflight
   res.set({ 'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS' });
   return res.sendStatus(204);
 });
 
 // POST fallback for status toggle (some environments block PATCH) - body: { isActive: boolean }
-router.post('/:id('+objectIdPattern+')/status', authorize('admin'), async (req, res) => {
+router.post('/:id(' + objectIdPattern + ')/status', authorize('admin'), async (req, res) => {
   try {
     const { isActive } = req.body;
     if (typeof isActive !== 'boolean') {
@@ -200,7 +202,7 @@ router.post('/:id('+objectIdPattern+')/status', authorize('admin'), async (req, 
   }
 });
 
-router.patch('/:id('+objectIdPattern+')/status', authorize('admin'), async (req, res) => {
+router.patch('/:id(' + objectIdPattern + ')/status', authorize('admin'), async (req, res) => {
   try {
     const { isActive } = req.body;
     if (typeof isActive !== 'boolean') {
@@ -211,16 +213,16 @@ router.patch('/:id('+objectIdPattern+')/status', authorize('admin'), async (req,
     }
     const user = await User.findByIdAndUpdate(req.params.id, { isActive }, { new: true }).select('-password');
     if (!user) return res.status(404).json({ message: 'User not found' });
-  if (process.env.NODE_ENV !== 'production') console.log('[users:status] set', req.params.id, 'isActive=', isActive);
+    if (process.env.NODE_ENV !== 'production') console.log('[users:status] set', req.params.id, 'isActive=', isActive);
     res.json(toClientUser(user));
   } catch (error) {
-  if (process.env.NODE_ENV !== 'production') console.error('[users:status] error', error.message || error);
+    if (process.env.NODE_ENV !== 'production') console.error('[users:status] error', error.message || error);
     res.status(500).json({ message: 'Error updating status' });
   }
 });
 
 // DELETE /api/users/:id - delete user (admin) cannot delete self
-router.delete('/:id('+objectIdPattern+')', authorize('admin'), async (req, res) => {
+router.delete('/:id(' + objectIdPattern + ')', authorize('admin'), async (req, res) => {
   try {
     if (req.user.id === req.params.id) {
       return res.status(400).json({ message: 'You cannot delete your own account' });
@@ -234,7 +236,7 @@ router.delete('/:id('+objectIdPattern+')', authorize('admin'), async (req, res) 
 });
 
 // PATCH /api/users/:id/password - admin sets/resets a user's password
-router.patch('/:id('+objectIdPattern+')/password', authorize('admin'), async (req, res) => {
+router.patch('/:id(' + objectIdPattern + ')/password', authorize('admin'), async (req, res) => {
   try {
     const { password } = req.body;
     if (!password || password.length < 6) {
@@ -245,10 +247,30 @@ router.patch('/:id('+objectIdPattern+')/password', authorize('admin'), async (re
     user.password = password; // pre-save hook will hash
     user.firstLoginResetRequired = false;
     await user.save();
-    sendPasswordChangedEmail(user.email).catch(()=>{});
+    sendPasswordChangedEmail(user.email).catch(() => { });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ message: 'Error updating password' });
+  }
+});
+
+// GET /api/users/online - get list of online users (admin only)
+router.get('/online', authorize('admin'), async (req, res) => {
+  try {
+    // Get socket service instance from the app
+    const io = req.app.get('io');
+    if (!io || !io.socketService) {
+      return res.status(500).json({ message: 'Socket service not available' });
+    }
+
+    const onlineUsers = await io.socketService.getOnlineUsers();
+    res.json({
+      success: true,
+      data: onlineUsers
+    });
+  } catch (error) {
+    console.error('Error fetching online users:', error);
+    res.status(500).json({ message: 'Error fetching online users' });
   }
 });
 

@@ -19,13 +19,41 @@ const SecurityAlert = require('../models/SecurityAlert');
 const getAllDevices = async (req, res) => {
   try {
     let query = {};
-    
+
     if (req.user.role !== 'admin') {
-      query._id = { $in: req.user.assignedDevices };
+      // Build complex query for device access
+      const accessConditions = [];
+
+      // Direct device assignments
+      if (req.user.assignedDevices && req.user.assignedDevices.length > 0) {
+        accessConditions.push({ _id: { $in: req.user.assignedDevices } });
+      }
+
+      // Classroom-based access
+      if (req.user.assignedRooms && req.user.assignedRooms.length > 0) {
+        accessConditions.push({ classroom: { $in: req.user.assignedRooms } });
+      }
+
+      // Department-based access for faculty/HOD
+      if ((req.user.role === 'faculty' || req.user.role === 'hod') && req.user.department) {
+        accessConditions.push({
+          classroom: { $regex: `^${req.user.department}-`, $options: 'i' }
+        });
+      }
+
+      // If no access conditions, user can't see any devices
+      if (accessConditions.length === 0) {
+        return res.json({
+          success: true,
+          data: []
+        });
+      }
+
+      query.$or = accessConditions;
     }
 
     const devices = await Device.find(query).populate('assignedUsers', 'name email role');
-    
+
     res.json({
       success: true,
       data: devices
@@ -56,11 +84,11 @@ const createDevice = async (req, res) => {
       switches = []
     } = req.body;
 
-  // Validate required fields (ipAddress also required by schema)
-  if (!name || !macAddress || !location || !ipAddress) {
+    // Validate required fields (ipAddress also required by schema)
+    if (!name || !macAddress || !location || !ipAddress) {
       return res.status(400).json({
         error: 'Validation failed',
-    details: 'Name, MAC address, IP address, and location are required'
+        details: 'Name, MAC address, IP address, and location are required'
       });
     }
 
@@ -90,7 +118,7 @@ const createDevice = async (req, res) => {
         details: 'Invalid IP address format'
       });
     }
-    const octetsOk = ipAddress.split('.').every(o => Number(o) >=0 && Number(o) <=255);
+    const octetsOk = ipAddress.split('.').every(o => Number(o) >= 0 && Number(o) <= 255);
     if (!octetsOk) {
       return res.status(400).json({
         error: 'Validation failed',
@@ -147,7 +175,7 @@ const createDevice = async (req, res) => {
     });
 
     await device.save();
-  // Log activity with new action type
+    // Log activity with new action type
     try {
       await ActivityLog.create({
         deviceId: device._id,
@@ -163,13 +191,13 @@ const createDevice = async (req, res) => {
       if (process.env.NODE_ENV !== 'production') console.warn('[deviceController] activity log failed', logErr.message);
     }
 
-  // Broadcast new device
-  const emitDeviceStateChanged = req.app.get('emitDeviceStateChanged');
-  if (emitDeviceStateChanged) {
-    emitDeviceStateChanged(device, { source: 'controller:createDevice' });
-  } else {
-    req.app.get('io').emit('device_state_changed', { deviceId: device.id, state: device, ts: Date.now() });
-  }
+    // Broadcast new device
+    const emitDeviceStateChanged = req.app.get('emitDeviceStateChanged');
+    if (emitDeviceStateChanged) {
+      emitDeviceStateChanged(device, { source: 'controller:createDevice' });
+    } else {
+      req.app.get('io').emit('device_state_changed', { deviceId: device.id, state: device, ts: Date.now() });
+    }
 
     // Push updated config to ESP32 if connected (include manual fields)
     try {
@@ -285,7 +313,7 @@ const updateDevice = async (req, res) => {
     device.pirEnabled = pirEnabled !== undefined ? pirEnabled : device.pirEnabled;
     device.pirGpio = pirGpio || device.pirGpio;
     device.pirAutoOffDelay = pirAutoOffDelay || device.pirAutoOffDelay;
-    
+
     let removedSwitches = [];
     const oldSwitchesSnapshot = device.switches ? device.switches.map(sw => sw.toObject ? sw.toObject() : { ...sw }) : [];
     if (switches && Array.isArray(switches)) {
@@ -345,12 +373,12 @@ const updateDevice = async (req, res) => {
       if (process.env.NODE_ENV !== 'production') console.warn('[deviceController] activity log failed', logErr.message);
     }
 
-  const emitDeviceStateChanged = req.app.get('emitDeviceStateChanged');
-  if (emitDeviceStateChanged) {
-    emitDeviceStateChanged(device, { source: 'controller:updateDevice' });
-  } else {
-    req.app.get('io').emit('device_state_changed', { deviceId: device.id, state: device, ts: Date.now() });
-  }
+    const emitDeviceStateChanged = req.app.get('emitDeviceStateChanged');
+    if (emitDeviceStateChanged) {
+      emitDeviceStateChanged(device, { source: 'controller:updateDevice' });
+    } else {
+      req.app.get('io').emit('device_state_changed', { deviceId: device.id, state: device, ts: Date.now() });
+    }
 
     // If any switches were removed, proactively send OFF command for their relay gpios to ensure hardware deactivates them
     try {
@@ -362,7 +390,7 @@ const updateDevice = async (req, res) => {
             if (gpio !== undefined) {
               try {
                 logger.info('[hw] switch_command (removed->OFF) push', { mac: device.macAddress, gpio, state: false });
-              } catch {}
+              } catch { }
               ws.send(JSON.stringify({ type: 'switch_command', mac: device.macAddress, gpio, state: false, removed: true, seq: nextCmdSeq(device.macAddress) }));
             }
           });
@@ -418,11 +446,11 @@ const toggleSwitch = async (req, res) => {
     const { state, triggeredBy = 'user' } = req.body;
 
     const device = await Device.findById(deviceId);
-      if (!device) {
+    if (!device) {
       return res.status(404).json({ message: 'Device not found' });
     }
 
-  // Block toggle if device is offline to ensure consistency with UI
+    // Block toggle if device is offline to ensure consistency with UI
     if (device.status && device.status !== 'online') {
       // queue intent instead of hard blocking
       const targetSw = device.switches.find(sw => sw._id.toString() === switchId);
@@ -437,7 +465,7 @@ const toggleSwitch = async (req, res) => {
           deviceId: device._id.toString(), mac: device.macAddress, switchId, desired
         });
       }
-      try { req.app.get('io').emit('device_toggle_queued', { deviceId, switchId, desired }); } catch {}
+      try { req.app.get('io').emit('device_toggle_queued', { deviceId, switchId, desired }); } catch { }
       return res.status(202).json({ message: 'Device offline. Toggle queued.', queued: true });
     }
 
@@ -451,7 +479,7 @@ const toggleSwitch = async (req, res) => {
           message: 'Device is not identified/connected. Please wait for the device to connect and try again.'
         });
       }
-    } catch {}
+    } catch { }
 
     const switchIndex = device.switches.findIndex(sw => sw._id.toString() === switchId);
     if (switchIndex === -1) {
@@ -502,36 +530,36 @@ const toggleSwitch = async (req, res) => {
       if (process.env.NODE_ENV !== 'production') console.warn('[switch_intent emit failed]', e.message);
     }
 
-      // Push command to ESP32 if connected through raw WebSocket
-      let dispatchedToHardware = false;
-      let hwReason = 'not_attempted';
-      try {
-        if (global.wsDevices && updated.macAddress) {
-          const ws = global.wsDevices.get(updated.macAddress.toUpperCase());
-          if (ws && ws.readyState === 1) { // OPEN
-            const payload = {
-              type: 'switch_command',
-              mac: updated.macAddress,
-              gpio: (updatedSwitch && (updatedSwitch.relayGpio || updatedSwitch.gpio)) || (device.switches[switchIndex].relayGpio || device.switches[switchIndex].gpio),
-              state: desiredState,
-              seq: nextCmdSeq(updated.macAddress)
-            };
-            try {
-              logger.info('[hw] switch_command push', { mac: updated.macAddress, gpio: payload.gpio, state: payload.state, deviceId: updated._id.toString(), switchId });
-            } catch {}
-            ws.send(JSON.stringify(payload));
-            dispatchedToHardware = true;
-            hwReason = 'sent';
-          } else {
-            hwReason = ws ? `ws_not_open_state_${ws.readyState}` : 'ws_not_found';
-          }
+    // Push command to ESP32 if connected through raw WebSocket
+    let dispatchedToHardware = false;
+    let hwReason = 'not_attempted';
+    try {
+      if (global.wsDevices && updated.macAddress) {
+        const ws = global.wsDevices.get(updated.macAddress.toUpperCase());
+        if (ws && ws.readyState === 1) { // OPEN
+          const payload = {
+            type: 'switch_command',
+            mac: updated.macAddress,
+            gpio: (updatedSwitch && (updatedSwitch.relayGpio || updatedSwitch.gpio)) || (device.switches[switchIndex].relayGpio || device.switches[switchIndex].gpio),
+            state: desiredState,
+            seq: nextCmdSeq(updated.macAddress)
+          };
+          try {
+            logger.info('[hw] switch_command push', { mac: updated.macAddress, gpio: payload.gpio, state: payload.state, deviceId: updated._id.toString(), switchId });
+          } catch { }
+          ws.send(JSON.stringify(payload));
+          dispatchedToHardware = true;
+          hwReason = 'sent';
         } else {
-          hwReason = 'wsDevices_map_missing';
+          hwReason = ws ? `ws_not_open_state_${ws.readyState}` : 'ws_not_found';
         }
-      } catch (e) {
-        console.error('[switch_command push failed]', e.message);
-        hwReason = 'exception_' + e.message;
+      } else {
+        hwReason = 'wsDevices_map_missing';
       }
+    } catch (e) {
+      console.error('[switch_command push failed]', e.message);
+      hwReason = 'exception_' + e.message;
+    }
 
     res.json({
       success: true,
@@ -593,7 +621,7 @@ const getDeviceById = async (req, res) => {
   try {
     // If admin wants secret, explicitly select it
     const includeSecret = req.query.includeSecret === '1' || req.query.includeSecret === 'true';
-  let query = Device.findById(req.params.deviceId);
+    let query = Device.findById(req.params.deviceId);
     if (includeSecret && req.user && req.user.role === 'admin') {
       query = query.select('+deviceSecret');
     }
@@ -647,12 +675,12 @@ const deleteDevice = async (req, res) => {
       userAgent: req.get('User-Agent')
     });
 
-  const emitDeviceStateChanged = req.app.get('emitDeviceStateChanged');
-  if (emitDeviceStateChanged) {
-    emitDeviceStateChanged({ id: device.id, deleted: true }, { source: 'controller:deleteDevice' });
-  } else {
-    req.app.get('io').emit('device_state_changed', { deviceId: device.id, deleted: true, ts: Date.now() });
-  }
+    const emitDeviceStateChanged = req.app.get('emitDeviceStateChanged');
+    if (emitDeviceStateChanged) {
+      emitDeviceStateChanged({ id: device.id, deleted: true }, { source: 'controller:deleteDevice' });
+    } else {
+      req.app.get('io').emit('device_state_changed', { deviceId: device.id, deleted: true, ts: Date.now() });
+    }
 
     res.json({ success: true, message: 'Device deleted successfully' });
   } catch (error) {
@@ -677,7 +705,7 @@ const bulkToggleSwitches = async (req, res) => {
     const devices = await Device.find(match);
     let switchesChanged = 0;
 
-  for (const device of devices) {
+    for (const device of devices) {
       let deviceModified = false;
       device.switches.forEach(sw => {
         if (sw.state !== state) {
@@ -708,22 +736,22 @@ const bulkToggleSwitches = async (req, res) => {
         // NOTE: Do NOT emit device_state_changed here. We'll wait for ESP32 confirmations
         // via switch_result/state_update to avoid UI desync.
         // Push commands to ESP32 (raw WS) so physical relays change immediately
-    try {
-      if (global.wsDevices && device.macAddress) {
-        const ws = global.wsDevices.get(device.macAddress.toUpperCase());
-        if (ws && ws.readyState === 1) {
-          for (const sw of device.switches) {
-            const payload = { type:'switch_command', mac: device.macAddress, gpio: sw.relayGpio || sw.gpio, state: sw.state, seq: nextCmdSeq(device.macAddress) };
-            try {
-              logger.info('[hw] switch_command (bulk) push', { mac: device.macAddress, gpio: payload.gpio, state: payload.state, deviceId: device._id.toString() });
-            } catch {}
-            ws.send(JSON.stringify(payload));
+        try {
+          if (global.wsDevices && device.macAddress) {
+            const ws = global.wsDevices.get(device.macAddress.toUpperCase());
+            if (ws && ws.readyState === 1) {
+              for (const sw of device.switches) {
+                const payload = { type: 'switch_command', mac: device.macAddress, gpio: sw.relayGpio || sw.gpio, state: sw.state, seq: nextCmdSeq(device.macAddress) };
+                try {
+                  logger.info('[hw] switch_command (bulk) push', { mac: device.macAddress, gpio: payload.gpio, state: payload.state, deviceId: device._id.toString() });
+                } catch { }
+                ws.send(JSON.stringify(payload));
+              }
+            }
           }
+        } catch (e) {
+          if (process.env.NODE_ENV !== 'production') console.warn('[bulkToggleSwitches push failed]', e.message);
         }
-      }
-    } catch (e) {
-      if (process.env.NODE_ENV !== 'production') console.warn('[bulkToggleSwitches push failed]', e.message);
-    }
       }
     }
 
@@ -782,7 +810,7 @@ const bulkToggleByType = async (req, res) => {
             classroom: device.classroom,
             location: device.location
           });
-        } catch {}
+        } catch { }
         // Do NOT emit device_state_changed here; wait for hardware confirmation
         // Push commands to ESP32 so physical relays reflect type-based bulk change
         try {
@@ -790,7 +818,7 @@ const bulkToggleByType = async (req, res) => {
             const ws = global.wsDevices.get(device.macAddress.toUpperCase());
             if (ws && ws.readyState === 1) {
               for (const sw of device.switches.filter(sw => sw.type === type)) {
-                const payload = { type:'switch_command', mac: device.macAddress, gpio: sw.relayGpio || sw.gpio, state: sw.state, seq: nextCmdSeq(device.macAddress) };
+                const payload = { type: 'switch_command', mac: device.macAddress, gpio: sw.relayGpio || sw.gpio, state: sw.state, seq: nextCmdSeq(device.macAddress) };
                 ws.send(JSON.stringify(payload));
               }
             }
@@ -801,7 +829,7 @@ const bulkToggleByType = async (req, res) => {
     try {
       const ids = devices.map(d => d.id);
       req.app.get('io').emit('bulk_switch_intent', { desiredState: state, deviceIds: ids, filter: { type }, ts: Date.now() });
-    } catch {}
+    } catch { }
     res.json({ success: true, type, state, switchesChanged });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -844,7 +872,7 @@ const bulkToggleByLocation = async (req, res) => {
             classroom: device.classroom,
             location: device.location
           });
-        } catch {}
+        } catch { }
         // Do NOT emit device_state_changed here; wait for hardware confirmation
         // Push commands to ESP32 so physical relays reflect location-based bulk change
         try {
@@ -852,7 +880,7 @@ const bulkToggleByLocation = async (req, res) => {
             const ws = global.wsDevices.get(device.macAddress.toUpperCase());
             if (ws && ws.readyState === 1) {
               for (const sw of device.switches) {
-                const payload = { type:'switch_command', mac: device.macAddress, gpio: sw.relayGpio || sw.gpio, state: sw.state, seq: nextCmdSeq(device.macAddress) };
+                const payload = { type: 'switch_command', mac: device.macAddress, gpio: sw.relayGpio || sw.gpio, state: sw.state, seq: nextCmdSeq(device.macAddress) };
                 ws.send(JSON.stringify(payload));
               }
             }
@@ -863,7 +891,7 @@ const bulkToggleByLocation = async (req, res) => {
     try {
       const ids = devices.map(d => d.id);
       req.app.get('io').emit('bulk_switch_intent', { desiredState: state, deviceIds: ids, filter: { location }, ts: Date.now() });
-    } catch {}
+    } catch { }
     res.json({ success: true, location, state, switchesChanged });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -879,6 +907,6 @@ module.exports = {
   updateDevice,
   deleteDevice,
   bulkToggleSwitches
-  ,bulkToggleByType
-  ,bulkToggleByLocation
+  , bulkToggleByType
+  , bulkToggleByLocation
 };

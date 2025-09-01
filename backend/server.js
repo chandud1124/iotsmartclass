@@ -23,9 +23,9 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Enable request logging
 const requestLogger = morgan('combined', {
-    stream: {
-        write: (message) => logger.info(message.trim())
-    }
+  stream: {
+    write: (message) => logger.info(message.trim())
+  }
 });
 const mongoose = require('mongoose');
 const http = require('http');
@@ -109,7 +109,7 @@ const connectDB = async (retries = 5) => {
   }
 };
 
-connectDB().catch(()=>{});
+connectDB().catch(() => { });
 
 mongoose.connection.on('error', (err) => {
   console.error('MongoDB error:', err);
@@ -129,12 +129,12 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
     // Allow all LAN origins for development
     const devOrigins = [
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://localhost:5175',
-  `http://${require('os').networkInterfaces()['en0']?.find(i=>i.family==='IPv4')?.address}:5173`, // Mac WiFi
-  `http://${require('os').networkInterfaces()['eth0']?.find(i=>i.family==='IPv4')?.address}:5173`, // Ethernet
-  'http://192.168.1.100:5173', // Example extra network host
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://localhost:5175',
+      `http://${require('os').networkInterfaces()['en0']?.find(i => i.family === 'IPv4')?.address}:5173`, // Mac WiFi
+      `http://${require('os').networkInterfaces()['eth0']?.find(i => i.family === 'IPv4')?.address}:5173`, // Ethernet
+      'http://192.168.1.100:5173', // Example extra network host
       '*'
     ];
     const allowedOrigins = process.env.NODE_ENV === 'production'
@@ -148,7 +148,7 @@ app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', req.headers['access-control-request-headers'] || 'Content-Type, Authorization');
-  // Silenced verbose preflight logging
+    // Silenced verbose preflight logging
     return res.status(204).end();
   }
   next();
@@ -156,7 +156,7 @@ app.use((req, res, next) => {
 
 // CORS configuration
 app.use(cors({
-  origin: function(origin, callback) {
+  origin: function (origin, callback) {
     // Allow requests from localhost and LAN IPs
     const allowed = [
       'http://localhost:5173',
@@ -257,7 +257,7 @@ io.engine.on('connection', (rawSocket) => {
 // Rate limiting - Very permissive for development
 const limiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: process.env.NODE_ENV === 'production' 
+  max: process.env.NODE_ENV === 'production'
     ? (parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100)  // 100 requests per minute in production
     : 1000000,  // Essentially unlimited in development
   message: 'Too many requests from this IP, please try again later.',
@@ -296,6 +296,7 @@ apiRouter.use('/settings', apiLimiter, settingsRoutes);
 // Google Calendar routes (primary path + legacy alias)
 apiRouter.use('/google-calendar', apiLimiter, googleCalendarRoutes);
 apiRouter.use('/calendar', apiLimiter, googleCalendarRoutes); // legacy alias
+apiRouter.use('/classroom', apiLimiter, require('./routes/classroom'));
 
 // Mount all routes under /api
 // Health check endpoint
@@ -402,6 +403,12 @@ io.on('connection', (socket) => {
 // Make io accessible to routes and globally (for services without req)
 app.set('io', io);
 global.io = io;
+
+// Initialize Socket Service for user tracking
+const SocketService = require('./services/socketService');
+const socketService = new SocketService(io);
+io.socketService = socketService;
+
 // Expose sequence-aware emitter to controllers
 app.set('emitDeviceStateChanged', emitDeviceStateChanged);
 
@@ -459,7 +466,7 @@ wss.on('connection', (ws) => {
       const mac = (data.mac || data.macAddress || '').toUpperCase();
       const secret = data.secret || data.signature;
       if (!mac) {
-        ws.send(JSON.stringify({ type:'error', reason:'missing_mac' }));
+        ws.send(JSON.stringify({ type: 'error', reason: 'missing_mac' }));
         return;
       }
       try {
@@ -470,8 +477,8 @@ wss.on('connection', (ws) => {
           // If deviceSecret not set, allow temporary identification without secret
           if (!device) {
             logger.warn('[identify] device_not_registered', { mac });
-            ws.send(JSON.stringify({ type:'error', reason:'device_not_registered' }));
-            try { io.emit('identify_error', { mac, reason: 'device_not_registered' }); } catch {}
+            ws.send(JSON.stringify({ type: 'error', reason: 'device_not_registered' }));
+            try { io.emit('identify_error', { mac, reason: 'device_not_registered' }); } catch { }
             return;
           }
         } else if (!secret || device.deviceSecret !== secret) {
@@ -479,14 +486,14 @@ wss.on('connection', (ws) => {
             logger.warn('[identify] secret mismatch but ALLOW_INSECURE_IDENTIFY=1, allowing temporary identify', { mac });
           } else {
             logger.warn('[identify] invalid_or_missing_secret', { mac, provided: secret ? 'present' : 'missing' });
-            ws.send(JSON.stringify({ type:'error', reason:'invalid_or_missing_secret' }));
-            try { io.emit('identify_error', { mac, reason: 'invalid_or_missing_secret' }); } catch {}
+            ws.send(JSON.stringify({ type: 'error', reason: 'invalid_or_missing_secret' }));
+            try { io.emit('identify_error', { mac, reason: 'invalid_or_missing_secret' }); } catch { }
             return;
           }
         }
-  ws.mac = mac;
-  // Attach secret for this connection (if available)
-  ws.secret = (device && device.deviceSecret) ? device.deviceSecret : undefined;
+        ws.mac = mac;
+        // Attach secret for this connection (if available)
+        ws.secret = (device && device.deviceSecret) ? device.deviceSecret : undefined;
         wsDevices.set(mac, ws);
         device.status = 'online';
         device.lastSeen = new Date();
@@ -518,9 +525,9 @@ wss.on('connection', (ws) => {
         })) : [];
         ws.send(JSON.stringify({
           type: 'identified',
-            mac,
-            mode: device.deviceSecret ? 'secure' : 'insecure',
-            switches: switchConfig
+          mac,
+          mode: device.deviceSecret ? 'secure' : 'insecure',
+          switches: switchConfig
         }));
         // Immediately send a full config_update so firmware can apply current states and GPIO mapping
         try {
@@ -547,8 +554,8 @@ wss.on('connection', (ws) => {
           logger.warn('[identify] failed to send config_update', e.message);
         }
         logger.info(`[esp32] identified ${mac}`);
-  // Notify frontend clients for immediate UI updates / queued toggle flush
-  try { io.emit('device_connected', { deviceId: device.id, mac }); } catch {}
+        // Notify frontend clients for immediate UI updates / queued toggle flush
+        try { io.emit('device_connected', { deviceId: device.id, mac }); } catch { }
       } catch (e) {
         logger.error('[identify] error', e.message);
       }
@@ -570,7 +577,7 @@ wss.on('connection', (ws) => {
       } catch (e) { /* silent */ }
       return;
     }
-  if (type === 'state_update') {
+    if (type === 'state_update') {
       // basic rate limit: max 5 per 5s per device
       const now = Date.now();
       if (!ws._stateRL) ws._stateRL = [];
@@ -625,9 +632,9 @@ wss.on('connection', (ws) => {
           device.pirSensorLastTriggered = new Date();
         }
         device.lastSeen = new Date();
-  await device.save();
-  emitDeviceStateChanged(device, { source: 'esp32:state_update' });
-  ws.send(JSON.stringify({ type: 'state_ack', ts: Date.now(), changed }));
+        await device.save();
+        emitDeviceStateChanged(device, { source: 'esp32:state_update' });
+        ws.send(JSON.stringify({ type: 'state_ack', ts: Date.now(), changed }));
       } catch (e) {
         logger.error('[esp32 state_update] error', e.message);
       }
@@ -645,7 +652,7 @@ wss.on('connection', (ws) => {
           const actual = data.actualState !== undefined ? !!data.actualState : false;
           const seq = data.seq || 0;
           const ts = data.ts || 0;
-          const base = `${mac}|${gpio}|${success?1:0}|${requested?1:0}|${actual?1:0}|${seq}|${ts}`;
+          const base = `${mac}|${gpio}|${success ? 1 : 0}|${requested ? 1 : 0}|${actual ? 1 : 0}|${seq}|${ts}`;
           const exp = crypto.createHmac('sha256', ws.secret).update(base).digest('hex');
           if (!sig || sig !== exp) {
             logger.warn('[hmac] invalid switch_result signature', { mac: ws.mac, gpio, seq });
@@ -678,7 +685,7 @@ wss.on('connection', (ws) => {
           if (reason === 'stale_seq') {
             try {
               logger.debug('[switch_result] stale_seq drop', { mac: ws.mac, gpio, requested });
-            } catch {}
+            } catch { }
             // Still forward a lightweight switch_result so UI can optionally refresh
             io.emit('switch_result', { deviceId: device.id, gpio, requestedState: requested, actualState: actual, success: false, reason, ts: Date.now() });
             return;
@@ -717,7 +724,7 @@ wss.on('connection', (ws) => {
     if (ws.mac) {
       wsDevices.delete(ws.mac);
       logger.info(`[esp32] disconnected ${ws.mac}`);
-  try { io.emit('device_disconnected', { mac: ws.mac }); } catch {}
+      try { io.emit('device_disconnected', { mac: ws.mac }); } catch { }
       // Immediately mark device offline instead of waiting for periodic scan
       (async () => {
         try {
@@ -752,8 +759,8 @@ setInterval(async () => {
     const stale = await Device.find({ lastSeen: { $lt: new Date(cutoff) }, status: { $ne: 'offline' } });
     for (const d of stale) {
       d.status = 'offline';
-  await d.save();
-  emitDeviceStateChanged(d, { source: 'offline-scan' });
+      await d.save();
+      emitDeviceStateChanged(d, { source: 'offline-scan' });
     }
   } catch (e) {
     logger.error('[offline-scan] error', e.message);

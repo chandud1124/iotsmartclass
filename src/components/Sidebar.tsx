@@ -33,6 +33,7 @@ const navigation = [
   { name: 'Users', icon: Users, href: '/users', current: false, requiresPermission: 'canManageUsers' },
   { name: 'Profile', icon: User, href: '/profile', current: false },
   { name: 'Permissions', icon: UserCheck, href: '/permissions', current: false, requiresPermission: 'canApproveUsers' },
+  { name: 'Classroom Access', icon: Shield, href: '/classroom-access', current: false, requiresPermission: 'canApproveUsers' },
   { name: 'Settings', icon: Settings, href: '/settings', current: false },
 ];
 

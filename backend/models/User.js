@@ -58,6 +58,12 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   }],
+  classroomPermissions: {
+    canAccessAllClassrooms: { type: Boolean, default: false },
+    departmentOverride: { type: Boolean, default: false },
+    emergencyAccess: { type: Boolean, default: false },
+    bypassTimeRestrictions: { type: Boolean, default: false }
+  },
   isActive: {
     type: Boolean,
     default: false, // Users need approval to become active
@@ -126,6 +132,15 @@ const userSchema = new mongoose.Schema({
   },
   lastProfileUpdate: {
     type: Date
+  },
+  isOnline: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  lastSeen: {
+    type: Date,
+    default: Date.now
   }
 }, {
   timestamps: true

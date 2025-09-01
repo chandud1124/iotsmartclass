@@ -9,6 +9,7 @@ import { UserDialog } from '@/components/UserDialog';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
+import io from 'socket.io-client';
 
 interface User {
   id: string;
@@ -20,6 +21,8 @@ interface User {
   assignedDevices: string[];
   department?: string;
   accessLevel: 'full' | 'limited' | 'readonly';
+  isOnline?: boolean;
+  lastSeen?: Date;
 }
 
 const Users = () => {
@@ -33,6 +36,9 @@ const Users = () => {
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [me, setMe] = useState<string | null>(null);
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+  const [socket, setSocket] = useState<any>(null);
+  const [socketConnected, setSocketConnected] = useState(false);
 
   // load self id once
   useEffect(() => {
@@ -40,6 +46,76 @@ const Users = () => {
     if (stored) {
       try { setMe(JSON.parse(stored).id); } catch {}
     }
+  }, []);
+
+  const fetchOnlineUsers = useCallback(async () => {
+    try {
+      const response = await api.get('/users/online');
+      const onlineUserIds = new Set<string>(response.data.data.map((user: any) => user._id.toString()));
+      setOnlineUsers(onlineUserIds);
+    } catch (error) {
+      console.error('Failed to fetch online users:', error);
+    }
+  }, []);
+
+  // Fetch online users on component mount
+  useEffect(() => {
+    fetchOnlineUsers();
+  }, [fetchOnlineUsers]);
+
+  // Socket connection for real-time updates
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+
+    const socketConnection = io(process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001', {
+      auth: { token }
+    });
+
+    socketConnection.on('connect', () => {
+      console.log('Connected to server for real-time updates');
+      setSocketConnected(true);
+      // Authenticate the socket connection
+      socketConnection.emit('authenticate', token);
+    });
+
+    socketConnection.on('authenticated', (data: any) => {
+      console.log('Socket authentication successful');
+    });
+
+    socketConnection.on('auth_error', (error: any) => {
+      console.error('Socket authentication error:', error);
+      setSocketConnected(false);
+    });
+
+    socketConnection.on('user_status_change', (data: any) => {
+      console.log('User status change:', data);
+      setOnlineUsers(prev => {
+        const newSet = new Set(prev);
+        if (data.isOnline) {
+          newSet.add(data.userId);
+        } else {
+          newSet.delete(data.userId);
+        }
+        return newSet;
+      });
+    });
+
+    socketConnection.on('disconnect', () => {
+      console.log('Disconnected from server');
+      setSocketConnected(false);
+    });
+
+    socketConnection.on('connect_error', (error: any) => {
+      console.error('Socket connection error:', error);
+      setSocketConnected(false);
+    });
+
+    setSocket(socketConnection);
+
+    return () => {
+      socketConnection.disconnect();
+    };
   }, []);
 
   const fetchUsers = useCallback(async () => {
@@ -234,8 +310,18 @@ const Users = () => {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">User Management</h1>
-          <p className="text-muted-foreground mt-1">Manage faculty, security, and student access</p>
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
+            User Management
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <div className={`w-2 h-2 rounded-full ${socketConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              {socketConnected ? 'Live' : 'Offline'}
+            </div>
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              {onlineUsers.size} online
+            </div>
+          </h1>
+          <p className="text-muted-foreground mt-1">Manage faculty, security, and student access with real-time online status</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
           <div className="relative flex-1 sm:w-64">
@@ -253,6 +339,10 @@ const Users = () => {
           </Button>
           <Button variant="outline" onClick={() => { setSearchInput(''); setSearch(''); setPage(1); }} disabled={loading}>
             <RefreshCcw className="w-4 h-4 mr-1" /> Reset
+          </Button>
+          <Button variant="outline" onClick={fetchOnlineUsers} disabled={loading}>
+            <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+            Refresh Online
           </Button>
           <Button onClick={() => setDialogOpen(true)} disabled={loading}>
             <Plus className="w-4 h-4 mr-2" /> Add User
@@ -285,6 +375,12 @@ const Users = () => {
                   <div className="flex-1">
                     <CardTitle className="text-lg flex items-center gap-2">
                       {user.name}
+                      {onlineUsers.has(user.id) && (
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Online now"></div>
+                          <span className="text-xs text-green-600 font-medium">Online</span>
+                        </div>
+                      )}
                       {me === user.id && (
                         <Badge variant="outline" className="text-[10px]">You</Badge>
                       )}
@@ -308,6 +404,13 @@ const Users = () => {
                     <span className="text-sm font-medium">Status:</span>
                     <Badge variant={user.isActive ? 'default' : 'secondary'}>
                       {user.isActive ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Online:</span>
+                    <Badge variant={onlineUsers.has(user.id) ? 'default' : 'secondary'} className="flex items-center gap-1">
+                      <div className={`w-2 h-2 rounded-full ${onlineUsers.has(user.id) ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                      {onlineUsers.has(user.id) ? 'Online' : 'Offline'}
                     </Badge>
                   </div>
                   <div className="flex items-center justify-between">

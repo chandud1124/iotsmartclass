@@ -32,6 +32,12 @@ export const usePermissions = () => {
     const canViewSecurityAlerts = isSecurity || hasManagementAccess;
     const canManageUsers = hasManagementAccess;
 
+    // Classroom-specific permissions
+    const canAccessAllClassrooms = (user as any)?.classroomPermissions?.canAccessAllClassrooms || false;
+    const canBypassTimeRestrictions = (user as any)?.classroomPermissions?.bypassTimeRestrictions || false;
+    const hasEmergencyAccess = (user as any)?.classroomPermissions?.emergencyAccess || false;
+    const hasDepartmentOverride = (user as any)?.classroomPermissions?.departmentOverride || false;
+
     return {
         // User status
         isApproved,
@@ -61,5 +67,11 @@ export const usePermissions = () => {
         canApproveExtensions,
         canViewSecurityAlerts,
         canManageUsers,
+
+        // Classroom-specific permissions
+        canAccessAllClassrooms,
+        canBypassTimeRestrictions,
+        hasEmergencyAccess,
+        hasDepartmentOverride,
     };
 };
