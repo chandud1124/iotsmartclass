@@ -1,6 +1,23 @@
 const winston = require('winston');
 const { format } = winston;
 
+// Override Winston Console transport to prevent EPIPE errors
+const originalConsoleTransport = winston.transports.Console;
+winston.transports.Console = class SafeConsole extends originalConsoleTransport {
+    log(info, callback) {
+        try {
+            super.log(info, callback);
+        } catch (error) {
+            if (error.code === 'EPIPE') {
+                // Silently ignore EPIPE errors
+                if (callback) callback();
+                return;
+            }
+            throw error;
+        }
+    }
+};
+
 // Configure Winston logger
 const logger = winston.createLogger({
     level: process.env.LOG_LEVEL || 'info',
@@ -15,14 +32,18 @@ const logger = winston.createLogger({
 });
 
 // Add console transport in development
-if (process.env.NODE_ENV !== 'production') {
-    logger.add(new winston.transports.Console({
-        format: format.combine(
-            format.colorize(),
-            format.simple()
-        )
-    }));
-}
+// Temporarily disabled to prevent EPIPE crashes
+// if (process.env.NODE_ENV !== 'production') {
+//     logger.add(new winston.transports.Console({
+//         format: format.combine(
+//             format.colorize(),
+//             format.simple()
+//         ),
+//         handleExceptions: true,
+//         handleRejections: true,
+//         stderrLevels: ['error', 'warn', 'info', 'debug']
+//     }));
+// }
 
 const errorLogger = (err, req, res, next) => {
     const errorDetails = {

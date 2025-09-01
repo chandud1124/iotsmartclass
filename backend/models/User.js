@@ -113,14 +113,6 @@ const userSchema = new mongoose.Schema({
     expiry_date: Number,
     obtainedAt: { type: Date }
   },
-  profilePicture: {
-    type: String,
-    trim: true
-  },
-  idDocument: {
-    type: String,
-    trim: true
-  },
   registrationReason: {
     type: String,
     trim: true,

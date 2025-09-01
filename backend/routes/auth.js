@@ -1,7 +1,5 @@
 
 const express = require('express');
-const multer = require('multer');
-const path = require('path');
 const {
   register,
   login,
@@ -24,39 +22,6 @@ const { auth } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validationHandler');
 const { body, param } = require('express-validator');
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, '../uploads');
-    // Create directory if it doesn't exist
-    require('fs').mkdirSync(uploadPath, { recursive: true });
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    // Generate unique filename
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const fileFilter = (req, file, cb) => {
-  // Accept images and PDFs only
-  if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
-    cb(null, true);
-  } else {
-    cb(new Error('Only image and PDF files are allowed'), false);
-  }
-};
-
-const upload = multer({
-  storage: storage,
-  fileFilter: fileFilter,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-    files: 2 // Maximum 2 files
-  }
-});
-
 const router = express.Router();
 
 // Validation middleware
@@ -64,11 +29,12 @@ const registerValidation = [
   body('name').trim().isLength({ min: 2 }).withMessage('Name must be at least 2 characters'),
   body('email').isEmail().withMessage('Please provide a valid email'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-  body('role').optional().isIn(['admin', 'principal', 'dean', 'hod', 'faculty', 'security', 'student', 'user']).withMessage('Invalid role'),
-  body('department').optional().trim().isLength({ min: 2 }).withMessage('Department must be at least 2 characters'),
-  body('employeeId').optional().trim().isLength({ min: 1 }).withMessage('Employee ID is required'),
+  body('role').isIn(['admin', 'principal', 'dean', 'hod', 'faculty', 'security', 'student', 'user']).withMessage('Invalid role'),
+  body('department').trim().isLength({ min: 2 }).withMessage('Department must be at least 2 characters'),
+  body('employeeId').optional().trim().isLength({ min: 1 }).withMessage('Employee ID is required for non-student roles'),
   body('phone').optional().isMobilePhone().withMessage('Please provide a valid phone number'),
-  body('designation').optional().trim().isLength({ min: 2 }).withMessage('Designation must be at least 2 characters')
+  body('designation').optional().trim().isLength({ min: 2 }).withMessage('Designation must be at least 2 characters'),
+  body('reason').optional().trim().isLength({ min: 1 }).withMessage('Reason is required')
 ];
 
 const loginValidation = [
@@ -91,10 +57,6 @@ const permissionActionValidation = [
 
 // Routes
 router.post('/register',
-  upload.fields([
-    { name: 'profilePicture', maxCount: 1 },
-    { name: 'idDocument', maxCount: 1 }
-  ]),
   registerValidation,
   handleValidationErrors,
   register

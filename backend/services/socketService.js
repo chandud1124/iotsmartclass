@@ -26,10 +26,10 @@ class SocketService {
 
                     if (user) {
                         // Store authenticated socket with user info
-                        this.connectedClients.set(socket.id, { 
-                            socket, 
-                            authenticated: true, 
-                            userId: user._id 
+                        this.connectedClients.set(socket.id, {
+                            socket,
+                            authenticated: true,
+                            userId: user._id
                         });
 
                         // Track online users
@@ -39,9 +39,9 @@ class SocketService {
                         this.onlineUsers.get(user._id.toString()).add(socket.id);
 
                         // Update user's online status
-                        await User.findByIdAndUpdate(user._id, { 
-                            isOnline: true, 
-                            lastSeen: new Date() 
+                        await User.findByIdAndUpdate(user._id, {
+                            isOnline: true,
+                            lastSeen: new Date()
                         });
 
                         // Notify admins about user coming online
@@ -68,25 +68,25 @@ class SocketService {
 
             socket.on('disconnect', async () => {
                 console.log('Client disconnected:', socket.id);
-                
+
                 const clientInfo = this.connectedClients.get(socket.id);
                 this.connectedClients.delete(socket.id);
 
                 if (clientInfo && clientInfo.userId) {
                     const userId = clientInfo.userId.toString();
                     const userSockets = this.onlineUsers.get(userId);
-                    
+
                     if (userSockets) {
                         userSockets.delete(socket.id);
-                        
+
                         // If user has no more active sockets, mark as offline
                         if (userSockets.size === 0) {
                             this.onlineUsers.delete(userId);
-                            
+
                             // Update user's online status
-                            await User.findByIdAndUpdate(userId, { 
-                                isOnline: false, 
-                                lastSeen: new Date() 
+                            await User.findByIdAndUpdate(userId, {
+                                isOnline: false,
+                                lastSeen: new Date()
                             });
 
                             // Notify admins about user going offline
@@ -160,9 +160,9 @@ class SocketService {
             const onlineUserIds = Array.from(this.onlineUsers.keys());
             if (onlineUserIds.length === 0) return [];
 
-            const onlineUsers = await User.find({ 
+            const onlineUsers = await User.find({
                 _id: { $in: onlineUserIds },
-                isActive: true 
+                isActive: true
             }).select('name email role department lastSeen');
 
             return onlineUsers.map(user => ({

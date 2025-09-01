@@ -7,7 +7,7 @@ class SocketService {
 
   constructor() {
     // Use backend IP and port, strip /api for socket connection
-  const RAW_SOCKET_URL = import.meta.env.VITE_WEBSOCKET_URL || 'http://192.168.0.108:3001';
+    const RAW_SOCKET_URL = import.meta.env.VITE_WEBSOCKET_URL || import.meta.env.VITE_WEBSOCKET_URL_LOCAL || 'http://localhost:3001';
     let derived = RAW_SOCKET_URL.replace(/\/$/, '');
     if (/\/api$/.test(derived)) {
       derived = derived.replace(/\/api$/, '');
@@ -19,15 +19,16 @@ class SocketService {
     }
     // Connect to base namespace
     this.socket = io(`${SOCKET_URL}`, {
-      transports: ['polling'],
+      transports: ['polling', 'websocket'], // Allow both polling and websocket
       autoConnect: true,
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       reconnectionAttempts: Infinity,
-      timeout: 10000,
+      timeout: 20000, // Increased timeout
       forceNew: false,
-      upgrade: false,
+      upgrade: true, // Allow transport upgrades
+      rememberUpgrade: true, // Remember successful upgrades
       path: '/socket.io'
     });
 
@@ -37,7 +38,7 @@ class SocketService {
       const pkg = require('socket.io-client/package.json');
       // eslint-disable-next-line no-console
       console.log(`[socket] client version ${pkg.version} connecting to ${SOCKET_URL}`);
-    } catch {/* ignore */}
+    } catch {/* ignore */ }
 
     this.setupDefaultListeners();
   }
@@ -46,8 +47,23 @@ class SocketService {
     this.socket?.on('connect', () => {
       console.log('Socket connected (transport=' + (this.socket as any)?.io?.engine?.transport?.name + ')');
       this.emit('client_connected', { timestamp: new Date() });
-  // Intentionally keep polling only (manual upgrade disabled)
-  console.log('[socket] staying on polling transport (manual upgrade disabled)');
+    });
+
+    this.socket?.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+    });
+
+    this.socket?.on('disconnect', (reason) => {
+      console.log('Socket disconnected:', reason);
+    });
+
+    // Handle transport upgrades
+    this.socket?.io?.engine?.on('upgrade', () => {
+      console.log('Socket upgraded to WebSocket transport');
+    });
+
+    this.socket?.io?.engine?.on('upgradeError', (error) => {
+      console.warn('Socket upgrade failed, staying on polling:', error);
     });
 
     this.socket?.on('connect_error', (err) => {
@@ -57,9 +73,11 @@ class SocketService {
     this.socket?.on('disconnect', (reason) => {
       console.log('Socket disconnected', reason);
     });
+
     (this.socket?.io as any).on('reconnect_attempt', (attempt: number) => {
       console.log('[socket] reconnect_attempt', attempt);
     });
+
     this.socket?.on('close', (desc: any) => {
       console.log('[socket] close event', desc);
     });

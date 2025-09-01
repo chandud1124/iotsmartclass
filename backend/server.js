@@ -13,11 +13,19 @@ const routeMonitor = require('./middleware/routeMonitor');
 
 // Initialize error tracking
 process.on('uncaughtException', (error) => {
+  if (error.code === 'EPIPE') {
+    // Silently ignore EPIPE errors from logging
+    return;
+  }
   logger.error('Uncaught Exception:', error);
   process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
+  if (reason && reason.code === 'EPIPE') {
+    // Silently ignore EPIPE errors from logging
+    return;
+  }
   logger.error('Unhandled Rejection:', reason);
 });
 
@@ -27,6 +35,16 @@ const requestLogger = morgan('combined', {
     write: (message) => logger.info(message.trim())
   }
 });
+
+// Override console methods in production to prevent EPIPE errors
+if (process.env.NODE_ENV === 'production') {
+  const noop = () => { };
+  console.log = noop;
+  console.error = noop;
+  console.warn = noop;
+  console.info = noop;
+  console.debug = noop;
+}
 const mongoose = require('mongoose');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -112,17 +130,32 @@ const connectDB = async (retries = 5) => {
 connectDB().catch(() => { });
 
 mongoose.connection.on('error', (err) => {
-  console.error('MongoDB error:', err);
+  logger.error('MongoDB error:', err);
 });
 
 const app = express();
 const server = http.createServer(app);
+
+// Add request logging to the HTTP server
+server.on('request', (req, res) => {
+  logger.info(`[HTTP Server] ${req.method} ${req.url}`);
+});
 
 // Security middleware
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false
 }));
+
+// Debug middleware to log all requests (moved to the very beginning)
+app.use((req, res, next) => {
+  logger.info(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  logger.debug('Headers:', JSON.stringify(req.headers, null, 2));
+  if (req.body && Object.keys(req.body).length > 0) {
+    logger.debug('Body:', JSON.stringify(req.body, null, 2));
+  }
+  next();
+});
 
 // Manual preflight handler (before cors) to guarantee PATCH visibility
 app.use((req, res, next) => {
@@ -196,6 +229,8 @@ app.use(cors({
 // Body parser (single instance)
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Initialize main Socket.IO instance
 
 // Initialize main Socket.IO instance
 const io = socketIo(server, {
@@ -369,13 +404,13 @@ const createAdminUser = async () => {
 };
 
 // Socket.IO for real-time updates with additional diagnostics
-io.engine.on('connection_error', (err) => {
-  logger.error('[socket.io engine connection_error]', {
-    code: err.code,
-    message: err.message,
-    context: err.context
-  });
-});
+// io.engine.on('connection_error', (err) => {
+//   logger.error('[socket.io engine connection_error]', {
+//     code: err.code,
+//     message: err.message,
+//     context: err.context
+//   });
+// });
 
 io.on('connection', (socket) => {
   logger.info('Client connected:', socket.id);
@@ -499,7 +534,7 @@ wss.on('connection', (ws) => {
         device.lastSeen = new Date();
         await device.save();
         if (process.env.NODE_ENV !== 'production') {
-          console.log('[identify] device marked online', { mac, lastSeen: device.lastSeen.toISOString() });
+          logger.info('[identify] device marked online', { mac, lastSeen: device.lastSeen.toISOString() });
         }
         // Flush any queued intents
         if (Array.isArray(device.queuedIntents) && device.queuedIntents.length) {
@@ -780,6 +815,7 @@ app.get('/api/health', (req, res) => {
 
 // 404 handler
 app.use('*', (req, res) => {
+  logger.info('404 handler reached for:', req.method, req.url);
   res.status(404).json({ message: 'Route not found' });
 });
 
@@ -792,8 +828,8 @@ if (io && io.opts) {
   };
 }
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT} (accessible on any network interface)`);
-  console.log(`Environment: ${process.env.NODE_ENV}`);
+  logger.info(`Server running on port ${PORT} (accessible on any network interface)`);
+  logger.info(`Environment: ${process.env.NODE_ENV}`);
 });
 
 module.exports = { app, io };

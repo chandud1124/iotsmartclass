@@ -15,13 +15,11 @@ import {
     Phone,
     Building,
     Calendar,
-    Upload,
     Edit,
     Save,
     X,
     CheckCircle,
     AlertCircle,
-    FileText,
     Shield,
     Clock
 } from 'lucide-react';
@@ -39,8 +37,6 @@ interface UserProfile {
     phone?: string;
     employeeId?: string;
     designation?: string;
-    profilePicture?: string;
-    idDocument?: string;
     registrationReason?: string;
     isActive: boolean;
     isApproved: boolean;
@@ -247,7 +243,6 @@ const UserProfile: React.FC = () => {
                 <Card className="lg:col-span-1">
                     <CardHeader className="text-center">
                         <Avatar className="w-24 h-24 mx-auto mb-4">
-                            <AvatarImage src={profile.profilePicture} alt={profile.name} />
                             <AvatarFallback className="text-lg">
                                 {profile.name.split(' ').map(n => n[0]).join('')}
                             </AvatarFallback>
@@ -353,7 +348,6 @@ const UserProfile: React.FC = () => {
                             <TabsList>
                                 <TabsTrigger value="personal">Personal</TabsTrigger>
                                 <TabsTrigger value="professional">Professional</TabsTrigger>
-                                <TabsTrigger value="documents">Documents</TabsTrigger>
                                 <TabsTrigger value="security">Security</TabsTrigger>
                             </TabsList>
 
@@ -457,51 +451,6 @@ const UserProfile: React.FC = () => {
                                         </div>
                                     </div>
                                 )}
-                            </TabsContent>
-
-                            <TabsContent value="documents" className="space-y-4">
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between p-4 border rounded-lg">
-                                        <div className="flex items-center gap-3">
-                                            <Avatar className="w-10 h-10">
-                                                <AvatarImage src={profile.profilePicture} />
-                                                <AvatarFallback>
-                                                    <User className="w-4 h-4" />
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            <div>
-                                                <p className="font-medium">Profile Picture</p>
-                                                <p className="text-sm text-muted-foreground">
-                                                    {profile.profilePicture ? 'Uploaded' : 'Not uploaded'}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        {profile.profilePicture && (
-                                            <Button variant="outline" size="sm">
-                                                <Upload className="w-4 h-4 mr-2" />
-                                                Update
-                                            </Button>
-                                        )}
-                                    </div>
-
-                                    {profile.idDocument && (
-                                        <div className="flex items-center justify-between p-4 border rounded-lg">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                                                    <FileText className="w-4 h-4 text-blue-600" />
-                                                </div>
-                                                <div>
-                                                    <p className="font-medium">ID Document</p>
-                                                    <p className="text-sm text-muted-foreground">Uploaded</p>
-                                                </div>
-                                            </div>
-                                            <Button variant="outline" size="sm">
-                                                <Upload className="w-4 h-4 mr-2" />
-                                                Update
-                                            </Button>
-                                        </div>
-                                    )}
-                                </div>
                             </TabsContent>
 
                             <TabsContent value="security" className="space-y-4">

@@ -8,6 +8,7 @@ const ClassExtensionRequest = require('../models/ClassExtensionRequest');
 const Notification = require('../models/Notification');
 const ActivityLog = require('../models/ActivityLog');
 const { sendPasswordResetEmail } = require('../services/emailService');
+const { logger } = require('../middleware/logger');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -17,6 +18,9 @@ const generateToken = (id) => {
 
 const register = async (req, res) => {
   try {
+    logger.info('Registration request received');
+    logger.debug('Request body keys:', Object.keys(req.body || {}));
+
     const {
       name,
       email,
@@ -29,124 +33,79 @@ const register = async (req, res) => {
       reason
     } = req.body;
 
-    // Handle file uploads if present
-    const profilePicture = req.files?.profilePicture ? req.files.profilePicture[0] : null;
-    const idDocument = req.files?.idDocument ? req.files.idDocument[0] : null;
-
     // Check if user already exists
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
     if (existingUser) {
-      return res.status(400).json({ message: 'User already exists' });
-    }
-
-    // Check if there's already a pending permission request
-    const existingRequest = await PermissionRequest.findOne({
-      'requestDetails.email': email,
-      status: 'pending'
-    });
-    if (existingRequest) {
-      return res.status(400).json({ message: 'Registration request already pending approval' });
-    }
-
-    // Validate required fields
-    if (!name || !email || !password || !role || !department) {
-      return res.status(400).json({ message: 'Missing required fields' });
-    }
-
-    // Validate role-specific requirements
-    if (role !== 'student' && !employeeId) {
-      return res.status(400).json({ message: 'Employee ID is required for non-student roles' });
-    }
-
-    // Create user with inactive status
-    const user = await User.create({
-      name,
-      email,
-      password,
-      role: role || 'student',
-      department,
-      employeeId,
-      phone,
-      designation,
-      registrationReason: reason,
-      isActive: false,
-      isApproved: false
-    });
-
-    // Create permission request for admin approval
-    const permissionRequest = await PermissionRequest.create({
-      userId: user._id,
-      requestType: 'registration',
-      requestedBy: user._id,
-      requestDetails: {
-        name,
-        email,
-        role: role || 'student',
-        department,
-        employeeId,
-        phone,
-        designation,
-        reason,
-        hasProfilePicture: !!profilePicture,
-        hasIdDocument: !!idDocument
-      }
-    });
-
-    // Handle file uploads if present
-    if (profilePicture) {
-      // Save profile picture path
-      const profilePicturePath = `/uploads/profiles/${user._id}_${Date.now()}_${profilePicture.originalname}`;
-      user.profilePicture = profilePicturePath;
-    }
-
-    if (idDocument) {
-      // Save ID document path
-      const idDocumentPath = `/uploads/documents/${user._id}_${Date.now()}_${idDocument.originalname}`;
-      user.idDocument = idDocumentPath;
-    }
-
-    await user.save();
-
-    // Create notification for admins
-    const admins = await User.find({ role: 'admin', isActive: true });
-    for (const admin of admins) {
-      await Notification.createPermissionNotification({
-        recipient: admin._id,
-        requestId: permissionRequest._id,
-        requestType: 'submitted',
-        userName: name,
-        requestDetails: {
-          role: role || 'student',
-          department,
-          hasDocuments: !!(profilePicture || idDocument)
-        }
+      return res.status(400).json({
+        success: false,
+        message: 'User with this email already exists'
       });
     }
 
-    // Log the registration attempt
-    await ActivityLog.create({
-      userId: user._id,
-      action: 'USER_REGISTRATION_REQUEST',
-      details: `New user registration request submitted for ${email} with ${profilePicture ? 'profile picture' : 'no profile picture'} and ${idDocument ? 'ID document' : 'no ID document'}`,
-      ipAddress: req.ip,
-      userAgent: req.get('User-Agent')
+    // Check if employeeId is already taken (if provided)
+    if (employeeId) {
+      const existingEmployee = await User.findOne({ employeeId: employeeId.trim() });
+      if (existingEmployee) {
+        return res.status(400).json({
+          success: false,
+          message: 'Employee ID is already taken'
+        });
+      }
+    }
+
+    // Set default permissions based on role
+    const rolePermissions = {
+      admin: { canRequestExtensions: true, canApproveExtensions: true },
+      principal: { canRequestExtensions: true, canApproveExtensions: true },
+      dean: { canRequestExtensions: true, canApproveExtensions: true },
+      hod: { canRequestExtensions: true, canApproveExtensions: true },
+      faculty: { canRequestExtensions: true, canApproveExtensions: false },
+      security: { canRequestExtensions: false, canApproveExtensions: false },
+      student: { canRequestExtensions: false, canApproveExtensions: false },
+      user: { canRequestExtensions: false, canApproveExtensions: false }
+    };
+
+    // Create new user
+    const user = new User({
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
+      password,
+      role: role || 'user',
+      department: department ? department.trim() : '',
+      employeeId: employeeId ? employeeId.trim() : undefined,
+      phone: phone ? phone.trim() : undefined,
+      designation: designation ? designation.trim() : undefined,
+      registrationReason: reason ? reason.trim() : undefined,
+      ...rolePermissions[role] || rolePermissions.user
     });
 
+    // Save user (password will be hashed by pre-save hook)
+    await user.save();
+
+    logger.info(`New user registered: ${user.name} (${user.email}) - Role: ${user.role}`);
+
+    // Return success response
     res.status(201).json({
       success: true,
-      message: 'Registration request submitted successfully. Please wait for admin approval.',
+      message: 'Registration successful! Your account is pending admin approval.',
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
-        department: user.department
-      },
-      requestId: permissionRequest._id
+        department: user.department,
+        isActive: user.isActive,
+        isApproved: user.isApproved
+      }
     });
+
   } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    logger.error('Registration error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during registration',
+      error: error.message
+    });
   }
 };
 
@@ -470,14 +429,8 @@ const approvePermissionRequest = async (req, res) => {
       requestDetails: request.requestDetails
     });
 
-    // Log the approval
-    await ActivityLog.create({
-      userId: req.user.id,
-      action: 'PERMISSION_REQUEST_APPROVED',
-      details: `Approved permission request for user ${user.email}`,
-      ipAddress: req.ip,
-      userAgent: req.get('User-Agent')
-    });
+    // Log the approval (removed ActivityLog creation)
+    console.log(`Approved permission request for user ${user.email}`);
 
     res.json({
       success: true,
@@ -537,14 +490,8 @@ const rejectPermissionRequest = async (req, res) => {
       requestDetails: request.requestDetails
     });
 
-    // Log the rejection
-    await ActivityLog.create({
-      userId: req.user.id,
-      action: 'PERMISSION_REQUEST_REJECTED',
-      details: `Rejected permission request for user ${user.email}. Reason: ${rejectionReason}`,
-      ipAddress: req.ip,
-      userAgent: req.get('User-Agent')
-    });
+    // Log the rejection (removed ActivityLog creation)
+    console.log(`Rejected permission request for user ${user.email}. Reason: ${rejectionReason}`);
 
     res.json({
       success: true,
@@ -631,14 +578,8 @@ const requestClassExtension = async (req, res) => {
       await schedule.save();
     }
 
-    // Log the extension request
-    await ActivityLog.create({
-      userId: req.user.id,
-      action: 'CLASS_EXTENSION_REQUESTED',
-      details: `Class extension requested for room ${extensionRequest.roomNumber}, duration: ${extensionRequest.extensionDuration} minutes`,
-      ipAddress: req.ip,
-      userAgent: req.get('User-Agent')
-    });
+    // Log the extension request (removed ActivityLog creation)
+    console.log(`Class extension requested for room ${extensionRequest.roomNumber}`);
 
     res.status(201).json({
       success: true,
@@ -733,14 +674,8 @@ const approveExtensionRequest = async (req, res) => {
       reason: request.reason
     });
 
-    // Log the approval
-    await ActivityLog.create({
-      userId: req.user.id,
-      action: 'CLASS_EXTENSION_APPROVED',
-      details: `Approved class extension for room ${request.roomNumber}, duration: ${request.extensionDuration} minutes`,
-      ipAddress: req.ip,
-      userAgent: req.get('User-Agent')
-    });
+    // Log the approval (removed ActivityLog creation)
+    console.log(`Approved class extension for room ${request.roomNumber}`);
 
     res.json({
       success: true,
@@ -799,14 +734,8 @@ const rejectExtensionRequest = async (req, res) => {
       reason: request.reason
     });
 
-    // Log the rejection
-    await ActivityLog.create({
-      userId: req.user.id,
-      action: 'CLASS_EXTENSION_REJECTED',
-      details: `Rejected class extension for room ${request.roomNumber}. Reason: ${rejectionReason}`,
-      ipAddress: req.ip,
-      userAgent: req.get('User-Agent')
-    });
+    // Log the rejection (removed ActivityLog creation)
+    console.log(`Rejected class extension for room ${request.roomNumber}. Reason: ${rejectionReason}`);
 
     res.json({
       success: true,

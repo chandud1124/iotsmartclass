@@ -59,8 +59,6 @@ const Register: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [profilePicture, setProfilePicture] = useState<File | null>(null);
-  const [idDocument, setIdDocument] = useState<File | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Password strength calculation with detailed feedback
@@ -98,38 +96,6 @@ const Register: React.FC = () => {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'profile' | 'id') => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: 'File Too Large',
-        description: 'Please select a file smaller than 5MB',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
-    if (!allowedTypes.includes(file.type)) {
-      toast({
-        title: 'Invalid File Type',
-        description: 'Please select a JPEG, PNG, or PDF file',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    if (type === 'profile') {
-      setProfilePicture(file);
-    } else {
-      setIdDocument(file);
-    }
-  };
-
   const validateStep = (step: number): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -147,14 +113,11 @@ const Register: React.FC = () => {
         if (form.password !== form.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
         break;
 
-      case 3: // Professional Details
+      case 3: // Professional Details & Terms
         if (form.role !== 'student' && !form.employeeId.trim()) newErrors.employeeId = 'Employee ID is required';
         if (!form.phone.match(/^\+?[\d\s\-\(\)]+$/)) newErrors.phone = 'Valid phone number is required';
         if (form.role !== 'student' && !form.designation.trim()) newErrors.designation = 'Designation is required';
         if (!form.reason.trim()) newErrors.reason = 'Please provide a reason for registration';
-        break;
-
-      case 4: // Terms and Documents
         if (!form.agreeToTerms) newErrors.agreeToTerms = 'You must agree to terms and conditions';
         if (!form.agreeToPrivacy) newErrors.agreeToPrivacy = 'You must agree to privacy policy';
         if (!form.agreeToDataProcessing) newErrors.agreeToDataProcessing = 'You must agree to data processing';
@@ -167,7 +130,7 @@ const Register: React.FC = () => {
 
   const nextStep = () => {
     if (validateStep(currentStep)) {
-      setCurrentStep(prev => Math.min(prev + 1, 4));
+      setCurrentStep(prev => Math.min(prev + 1, 3));
     }
   };
 
@@ -177,28 +140,24 @@ const Register: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateStep(4)) return;
+    if (!validateStep(3)) return;
 
     setLoading(true);
     try {
-      const formData = new FormData();
+      // Prepare user data object (no longer using FormData since we removed file uploads)
+      const userData = {
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        role: form.role,
+        department: form.department,
+        employeeId: form.employeeId || undefined,
+        phone: form.phone || undefined,
+        designation: form.designation || undefined,
+        reason: form.reason || undefined
+      };
 
-      // Add basic form data
-      Object.entries(form).forEach(([key, value]) => {
-        if (key !== 'agreeToTerms' && key !== 'agreeToPrivacy' && key !== 'agreeToDataProcessing') {
-          formData.append(key, value.toString());
-        }
-      });
-
-      // Add files
-      if (profilePicture) {
-        formData.append('profilePicture', profilePicture);
-      }
-      if (idDocument) {
-        formData.append('idDocument', idDocument);
-      }
-
-      const response = await authAPI.register(formData);
+      const response = await authAPI.register(userData);
 
       if (!response.data?.success) {
         toast({
@@ -228,7 +187,7 @@ const Register: React.FC = () => {
 
   const renderStepIndicator = () => (
     <div className="flex items-center justify-center mb-8">
-      {[1, 2, 3, 4].map((step) => (
+      {[1, 2, 3].map((step) => (
         <div key={step} className="flex items-center">
           <div className={cn(
             "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
@@ -238,7 +197,7 @@ const Register: React.FC = () => {
           )}>
             {currentStep > step ? <CheckCircle className="w-4 h-4" /> : step}
           </div>
-          {step < 4 && (
+          {step < 3 && (
             <div className={cn(
               "w-12 h-0.5 mx-2",
               currentStep > step ? "bg-primary" : "bg-muted"
@@ -462,49 +421,6 @@ const Register: React.FC = () => {
               />
               {errors.reason && <p className="text-sm text-red-500">{errors.reason}</p>}
             </div>
-          </div>
-        );
-
-      case 4:
-        return (
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Profile Picture (Optional)</Label>
-                <div className="flex items-center gap-4">
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileChange(e, 'profile')}
-                    className="hidden"
-                    id="profile-picture"
-                  />
-                  <Label htmlFor="profile-picture" className="flex items-center gap-2 cursor-pointer border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 hover:border-muted-foreground/50 transition-colors">
-                    <Upload className="w-4 h-4" />
-                    <span>{profilePicture ? profilePicture.name : 'Upload profile picture'}</span>
-                  </Label>
-                </div>
-                <p className="text-xs text-muted-foreground">Max 5MB, JPEG/PNG only</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label>ID Document (Optional)</Label>
-                <div className="flex items-center gap-4">
-                  <Input
-                    type="file"
-                    accept="image/*,.pdf"
-                    onChange={(e) => handleFileChange(e, 'id')}
-                    className="hidden"
-                    id="id-document"
-                  />
-                  <Label htmlFor="id-document" className="flex items-center gap-2 cursor-pointer border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 hover:border-muted-foreground/50 transition-colors">
-                    <Upload className="w-4 h-4" />
-                    <span>{idDocument ? idDocument.name : 'Upload ID document'}</span>
-                  </Label>
-                </div>
-                <p className="text-xs text-muted-foreground">Employee ID, Student ID, or Government ID (Max 5MB)</p>
-              </div>
-            </div>
 
             <div className="space-y-4">
               <div className="flex items-center space-x-2">
@@ -573,7 +489,7 @@ const Register: React.FC = () => {
             </Button>
             <div>
               <CardTitle>Create Your Account</CardTitle>
-              <CardDescription>Step {currentStep} of 4 - Join the IoT Classroom Management System</CardDescription>
+              <CardDescription>Step {currentStep} of 3 - Join the IoT Classroom Management System</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -595,7 +511,7 @@ const Register: React.FC = () => {
             Previous
           </Button>
 
-          {currentStep < 4 ? (
+          {currentStep < 3 ? (
             <Button type="button" onClick={nextStep}>
               Next
             </Button>
