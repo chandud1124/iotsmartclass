@@ -5,17 +5,17 @@ import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { useIsMobile } from '@/hooks/use-mobile';
 
-export const Layout = ({ children }: { children: React.ReactNode }) => {
+export const Layout = () => {
   const isMobile = useIsMobile();
-  
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="flex h-screen">
-        <Sidebar className={`${isMobile ? 'hidden' : 'hidden md:block'}`} />
-        <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="min-h-screen bg-background w-full">
+      <div className="flex h-screen w-full min-w-0">
+        <Sidebar className={`${isMobile ? 'hidden' : 'flex-shrink-0 block'}`} />
+        <div className="flex-1 flex flex-col min-w-0 relative ml-0 overflow-hidden">
           <Header />
-          <main className="flex-1 overflow-y-auto p-6">
-            {children}
+          <main className="flex-1 overflow-y-auto p-6 min-h-0">
+            <Outlet />
           </main>
         </div>
       </div>

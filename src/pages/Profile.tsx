@@ -147,6 +147,42 @@ export const Profile = () => {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <Card className="p-6">
+          <h2 className="text-xl font-semibold mb-4">Account Information</h2>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Role</Label>
+              <div className="mt-1">
+                <span className="inline-block rounded bg-primary/10 text-primary px-3 py-1 text-sm uppercase tracking-wide font-medium">
+                  {user?.role}
+                </span>
+              </div>
+            </div>
+            {user?.department && (
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Department</Label>
+                <div className="mt-1">
+                  <span className="inline-block rounded bg-secondary/10 text-secondary-foreground px-3 py-1 text-sm uppercase tracking-wide font-medium">
+                    {user?.department}
+                  </span>
+                </div>
+              </div>
+            )}
+            {user?.designation && (
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Designation</Label>
+                <p className="mt-1 text-sm">{user?.designation}</p>
+              </div>
+            )}
+            {user?.employeeId && (
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Employee ID</Label>
+                <p className="mt-1 text-sm font-mono">{user?.employeeId}</p>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        <Card className="p-6">
           <h2 className="text-xl font-semibold mb-4">Personal Information</h2>
           <form onSubmit={handleProfileSubmit} className="space-y-4">
             <div>
@@ -201,7 +237,7 @@ export const Profile = () => {
                   className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowPassword(prev => ({ ...prev, current: !prev.current }))}
                 >
-                  {showPassword.current ? 
+                  {showPassword.current ?
                     <EyeOff className="h-4 w-4 text-gray-400" /> :
                     <Eye className="h-4 w-4 text-gray-400" />
                   }
@@ -227,7 +263,7 @@ export const Profile = () => {
                   className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowPassword(prev => ({ ...prev, new: !prev.new }))}
                 >
-                  {showPassword.new ? 
+                  {showPassword.new ?
                     <EyeOff className="h-4 w-4 text-gray-400" /> :
                     <Eye className="h-4 w-4 text-gray-400" />
                   }
@@ -253,7 +289,7 @@ export const Profile = () => {
                   className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowPassword(prev => ({ ...prev, confirm: !prev.confirm }))}
                 >
-                  {showPassword.confirm ? 
+                  {showPassword.confirm ?
                     <EyeOff className="h-4 w-4 text-gray-400" /> :
                     <Eye className="h-4 w-4 text-gray-400" />
                   }

@@ -55,14 +55,70 @@ const register = async (req, res) => {
 
     // Set default permissions based on role
     const rolePermissions = {
-      admin: { canRequestExtensions: true, canApproveExtensions: true },
-      principal: { canRequestExtensions: true, canApproveExtensions: true },
-      dean: { canRequestExtensions: true, canApproveExtensions: true },
-      hod: { canRequestExtensions: true, canApproveExtensions: true },
-      faculty: { canRequestExtensions: true, canApproveExtensions: false },
-      security: { canRequestExtensions: false, canApproveExtensions: false },
-      student: { canRequestExtensions: false, canApproveExtensions: false },
-      user: { canRequestExtensions: false, canApproveExtensions: false }
+      admin: {
+        canRequestExtensions: true,
+        canApproveExtensions: true,
+        canManageUsers: true,
+        canViewReports: true,
+        canControlDevices: true,
+        canAccessSecurity: true
+      },
+      principal: {
+        canRequestExtensions: true,
+        canApproveExtensions: true,
+        canManageUsers: false,
+        canViewReports: true,
+        canControlDevices: true,
+        canAccessSecurity: true
+      },
+      dean: {
+        canRequestExtensions: true,
+        canApproveExtensions: true,
+        canManageUsers: false,
+        canViewReports: true,
+        canControlDevices: true,
+        canAccessSecurity: false
+      },
+      hod: {
+        canRequestExtensions: true,
+        canApproveExtensions: true,
+        canManageUsers: false,
+        canViewReports: false,
+        canControlDevices: true,
+        canAccessSecurity: false
+      },
+      faculty: {
+        canRequestExtensions: true,
+        canApproveExtensions: false,
+        canManageUsers: false,
+        canViewReports: false,
+        canControlDevices: true,
+        canAccessSecurity: false
+      },
+      security: {
+        canRequestExtensions: false,
+        canApproveExtensions: false,
+        canManageUsers: false,
+        canViewReports: false,
+        canControlDevices: false,
+        canAccessSecurity: true
+      },
+      student: {
+        canRequestExtensions: false,
+        canApproveExtensions: false,
+        canManageUsers: false,
+        canViewReports: false,
+        canControlDevices: false,
+        canAccessSecurity: false
+      },
+      user: {
+        canRequestExtensions: false,
+        canApproveExtensions: false,
+        canManageUsers: false,
+        canViewReports: false,
+        canControlDevices: false,
+        canAccessSecurity: false
+      }
     };
 
     // Create new user

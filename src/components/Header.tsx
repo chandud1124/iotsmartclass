@@ -21,16 +21,16 @@ export const Header = () => {
   const { devices } = useDevices();
   const { alerts: notifications } = useSecurityNotifications();
   const { user } = useAuth();
-  
+
   const currentPage = navItems.find(item => item.to === location.pathname) || navItems[0];
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const notifRef = useRef<HTMLDivElement | null>(null);
   const userRef = useRef<HTMLDivElement | null>(null);
   const isMobile = useIsMobile();
-  
-    const connectedDevices = devices.filter(device => device.status === 'online').length;
-    const isConnected = connectedDevices > 0;
+
+  const connectedDevices = devices.filter(device => device.status === 'online').length;
+  const isConnected = connectedDevices > 0;
 
   // Only one dropdown open at a time
   const handleBellClick = () => {
@@ -56,7 +56,7 @@ export const Header = () => {
       const res = await fetch(`${origin}/api/google-calendar/auth-url`, { credentials: 'include' });
       const text = await res.text();
       let data: any = {};
-      try { data = JSON.parse(text); } catch { console.error('Non-JSON auth-url response', text.slice(0,120)); }
+      try { data = JSON.parse(text); } catch { console.error('Non-JSON auth-url response', text.slice(0, 120)); }
       if (data.url) {
         if (!data.url.includes('client_id=') || /client_id=&/.test(data.url)) {
           alert('Google OAuth client not configured (missing GOOGLE_CLIENT_ID).');
@@ -100,9 +100,9 @@ export const Header = () => {
   }, [anyOpen]);
 
   return (
-  <header className="glass border-b border-border/50 px-6 py-4 relative z-50">
+    <header className="glass border-b border-border/50 px-6 py-4 relative z-50">
       <div className="flex items-center justify-between">
-  <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4">
           {isMobile && (
             <Sheet>
               <SheetTrigger asChild>
@@ -123,13 +123,13 @@ export const Header = () => {
             <h1 className="text-2xl font-bold">{currentPage.title}</h1>
             <p className="text-sm text-muted-foreground">
               {location.pathname === '/' ? 'Monitor and control your IoT devices' :
-               location.pathname === '/devices' ? 'Manage your connected IoT devices' :
-               location.pathname === '/switches' ? 'Control individual switches' :
-               location.pathname === '/master' ? 'Master control for all switches' :
-               location.pathname === '/schedule' ? 'Automate your device schedules' :
-               location.pathname === '/users' ? 'Manage user access and permissions' :
-               location.pathname === '/settings' ? 'Configure system settings' :
-               'Monitor and control your IoT devices'}
+                location.pathname === '/devices' ? 'Manage your connected IoT devices' :
+                  location.pathname === '/switches' ? 'Control individual switches' :
+                    location.pathname === '/master' ? 'Master control for all switches' :
+                      location.pathname === '/schedule' ? 'Automate your device schedules' :
+                        location.pathname === '/users' ? 'Manage user access and permissions' :
+                          location.pathname === '/settings' ? 'Configure system settings' :
+                            'Monitor and control your IoT devices'}
             </p>
           </div>
         </div>
@@ -164,7 +164,7 @@ export const Header = () => {
           </div>
 
           {/* Notifications */}
-      <div className="relative" ref={notifRef}>
+          <div className="relative" ref={notifRef}>
             <Button
               variant="ghost"
               size="sm"
@@ -177,7 +177,7 @@ export const Header = () => {
               </span>
             </Button>
             {showNotifications && (
-        <Card className="absolute right-0 mt-2 w-80 z-[60] shadow-xl">
+              <Card className="absolute right-0 mt-2 w-80 z-[60] shadow-xl">
                 <CardHeader className="pb-3">
                   <CardTitle>Notifications</CardTitle>
                 </CardHeader>
@@ -216,14 +216,21 @@ export const Header = () => {
               {user && <span className="ml-1 hidden sm:inline text-xs font-medium max-w-[90px] truncate" title={user.name}>{user.name.split(' ')[0]}</span>}
             </Button>
             {showUserMenu && (
-        <Card className="absolute right-0 mt-2 w-48 z-[60] shadow-xl">
+              <Card className="absolute right-0 mt-2 w-48 z-[60] shadow-xl">
                 <CardContent className="p-0">
                   {user && (
                     <div className="px-4 py-2 border-b text-left text-xs">
                       <div className="font-medium text-sm truncate" title={user.name}>{user.name}</div>
                       <div className="text-muted-foreground truncate" title={user.email}>{user.email}</div>
-                      <div className="mt-1 inline-block rounded bg-primary/10 text-primary px-2 py-0.5 text-[10px] uppercase tracking-wide">
-                        {user.role}
+                      <div className="mt-1 space-y-1">
+                        <div className="inline-block rounded bg-primary/10 text-primary px-2 py-0.5 text-[10px] uppercase tracking-wide">
+                          {user.role}
+                        </div>
+                        {user.department && (
+                          <div className="inline-block rounded bg-secondary/10 text-secondary-foreground px-2 py-0.5 text-[10px] uppercase tracking-wide ml-1">
+                            {user.department}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -259,8 +266,8 @@ export const Header = () => {
         </div>
       </div>
       {/* Overlay for dropdowns */}
-  {/* Optional dimmed backdrop only when a dropdown open (placed after header for stacking) */}
-  {anyOpen && <div className="fixed inset-0 bg-black/30 backdrop-blur-[1px] z-40" />}
+      {/* Optional dimmed backdrop only when a dropdown open (placed after header for stacking) */}
+      {anyOpen && <div className="fixed inset-0 bg-black/30 backdrop-blur-[1px] z-40" />}
     </header>
   );
 };

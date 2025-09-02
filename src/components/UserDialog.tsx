@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 interface UserData {
   name: string;
   email: string;
-  role: 'admin' | 'user' | 'security' | 'faculty';
+  role: 'admin' | 'principal' | 'dean' | 'hod' | 'faculty' | 'security' | 'student' | 'user';
   assignedDevices: string[];
   department?: string;
   accessLevel: 'full' | 'limited' | 'readonly';
@@ -25,15 +25,15 @@ interface UserDialogProps {
   user?: any;
 }
 
-export const UserDialog: React.FC<UserDialogProps> = ({ 
-  open, 
-  onOpenChange, 
-  onSave, 
-  user 
+export const UserDialog: React.FC<UserDialogProps> = ({
+  open,
+  onOpenChange,
+  onSave,
+  user
 }) => {
   const { devices } = useDevices();
   const { toast } = useToast();
-  
+
   const [formData, setFormData] = useState<UserData>({
     name: user?.name || '',
     email: user?.email || '',
@@ -49,11 +49,11 @@ export const UserDialog: React.FC<UserDialogProps> = ({
       if (user) {
         setFormData({
           name: user.name || '',
-            email: user.email || '',
-            role: user.role || 'user',
-            assignedDevices: user.assignedDevices || [],
-            department: user.department || '',
-            accessLevel: user.accessLevel || 'limited'
+          email: user.email || '',
+          role: user.role || 'user',
+          assignedDevices: user.assignedDevices || [],
+          department: user.department || '',
+          accessLevel: user.accessLevel || 'limited'
         });
       } else {
         setFormData({
@@ -88,7 +88,7 @@ export const UserDialog: React.FC<UserDialogProps> = ({
 
     onSave(formData);
     onOpenChange(false);
-    
+
     // Reset form for new users
     if (!user) {
       setFormData({
@@ -110,7 +110,7 @@ export const UserDialog: React.FC<UserDialogProps> = ({
             {user ? 'Edit User' : 'Add New User'}
           </DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -143,9 +143,13 @@ export const UserDialog: React.FC<UserDialogProps> = ({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Administrator</SelectItem>
-                  <SelectItem value="faculty">Faculty</SelectItem>
-                  <SelectItem value="security">Security</SelectItem>
-                  <SelectItem value="user">Student/User</SelectItem>
+                  <SelectItem value="principal">Principal</SelectItem>
+                  <SelectItem value="dean">Dean</SelectItem>
+                  <SelectItem value="hod">Head of Department</SelectItem>
+                  <SelectItem value="faculty">Faculty/Teacher</SelectItem>
+                  <SelectItem value="security">Security Personnel</SelectItem>
+                  <SelectItem value="student">Student</SelectItem>
+                  <SelectItem value="user">General Staff</SelectItem>
                 </SelectContent>
               </Select>
             </div>

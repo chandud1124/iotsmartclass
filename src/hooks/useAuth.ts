@@ -8,6 +8,8 @@ interface User {
   email: string;
   role: string;
   department: string;
+  designation?: string;
+  employeeId?: string;
   accessLevel: string;
   assignedDevices: string[];
 }
@@ -34,11 +36,11 @@ export const useAuth = () => {
   }, []);
 
   const checkAuthStatus = async () => {
-  if ((window as any).__authProfileInFlight) return; // simple client guard
-  (window as any).__authProfileInFlight = true;
+    if ((window as any).__authProfileInFlight) return; // simple client guard
+    (window as any).__authProfileInFlight = true;
     try {
       const token = localStorage.getItem('auth_token');
-      
+
       if (!token) {
         setLoading(false);
         setIsAuthenticated(false);
@@ -64,7 +66,7 @@ export const useAuth = () => {
       logout();
     } finally {
       setLoading(false);
-  (window as any).__authProfileInFlight = false;
+      (window as any).__authProfileInFlight = false;
     }
   };
 

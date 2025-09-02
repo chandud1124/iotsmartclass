@@ -12,8 +12,9 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 export const navItems = [
+  // Core Operations
   {
-    title: "College",
+    title: "Dashboard",
     to: "/",
     icon: <Home className="h-4 w-4" />,
     page: <Index />,
@@ -36,12 +37,16 @@ export const navItems = [
     icon: <Shield className="h-4 w-4" />,
     page: <Master />,
   },
+
+  // Scheduling
   {
     title: "Schedule",
     to: "/schedule",
     icon: <Calendar className="h-4 w-4" />,
     page: <Schedule />,
   },
+
+  // User Management
   {
     title: "Users",
     to: "/users",
@@ -49,10 +54,10 @@ export const navItems = [
     page: <Users />,
   },
   {
-    title: "Profile",
-    to: "/profile",
-    icon: <User className="h-4 w-4" />,
-    page: <UserProfile />,
+    title: "Role Management",
+    to: "/roles",
+    icon: <Shield className="h-4 w-4" />,
+    page: <PermissionManagement />, // Reusing existing component
   },
   {
     title: "Permissions",
@@ -60,6 +65,22 @@ export const navItems = [
     icon: <UserCheck className="h-4 w-4" />,
     page: <PermissionManagement />,
   },
+  {
+    title: "Classroom Access",
+    to: "/classroom-access",
+    icon: <Shield className="h-4 w-4" />,
+    page: <PermissionManagement />, // Reusing existing component
+  },
+
+  // Account
+  {
+    title: "Profile",
+    to: "/profile",
+    icon: <User className="h-4 w-4" />,
+    page: <UserProfile />,
+  },
+
+  // System
   {
     title: "Settings",
     to: "/settings",

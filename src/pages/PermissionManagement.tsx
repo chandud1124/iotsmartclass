@@ -216,14 +216,14 @@ const PermissionManagement: React.FC = () => {
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-3">
                                                     <Avatar>
-                                                        <AvatarImage src={request.userId.profilePicture} />
+                                                        <AvatarImage src={request.userId?.profilePicture} />
                                                         <AvatarFallback>
-                                                            {request.userId.name.split(' ').map(n => n[0]).join('')}
+                                                            {request.userId?.name?.split(' ').map(n => n[0]).join('') || 'U'}
                                                         </AvatarFallback>
                                                     </Avatar>
                                                     <div>
-                                                        <h3 className="font-semibold">{request.userId.name}</h3>
-                                                        <p className="text-sm text-muted-foreground">{request.userId.email}</p>
+                                                        <h3 className="font-semibold">{request.userId?.name || 'Unknown User'}</h3>
+                                                        <p className="text-sm text-muted-foreground">{request.userId?.email || 'No email'}</p>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2">
@@ -236,15 +236,15 @@ const PermissionManagement: React.FC = () => {
                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                                                 <div className="flex items-center gap-2">
                                                     <Building className="w-4 h-4 text-muted-foreground" />
-                                                    <span className="text-sm">{request.userId.department}</span>
+                                                    <span className="text-sm">{request.userId?.department || 'N/A'}</span>
                                                 </div>
-                                                {request.userId.employeeId && (
+                                                {request.userId?.employeeId && (
                                                     <div className="flex items-center gap-2">
                                                         <User className="w-4 h-4 text-muted-foreground" />
                                                         <span className="text-sm">{request.userId.employeeId}</span>
                                                     </div>
                                                 )}
-                                                {request.userId.phone && (
+                                                {request.userId?.phone && (
                                                     <div className="flex items-center gap-2">
                                                         <Phone className="w-4 h-4 text-muted-foreground" />
                                                         <span className="text-sm">{request.userId.phone}</span>
@@ -272,11 +272,11 @@ const PermissionManagement: React.FC = () => {
                                                             <div className="grid grid-cols-2 gap-4">
                                                                 <div>
                                                                     <Label className="text-sm font-medium">Name</Label>
-                                                                    <p className="text-sm text-muted-foreground">{request.userId.name}</p>
+                                                                    <p className="text-sm text-muted-foreground">{request.userId?.name || 'N/A'}</p>
                                                                 </div>
                                                                 <div>
                                                                     <Label className="text-sm font-medium">Email</Label>
-                                                                    <p className="text-sm text-muted-foreground">{request.userId.email}</p>
+                                                                    <p className="text-sm text-muted-foreground">{request.userId?.email || 'N/A'}</p>
                                                                 </div>
                                                                 <div>
                                                                     <Label className="text-sm font-medium">Role</Label>
@@ -284,9 +284,9 @@ const PermissionManagement: React.FC = () => {
                                                                 </div>
                                                                 <div>
                                                                     <Label className="text-sm font-medium">Department</Label>
-                                                                    <p className="text-sm text-muted-foreground">{request.userId.department}</p>
+                                                                    <p className="text-sm text-muted-foreground">{request.userId?.department || 'N/A'}</p>
                                                                 </div>
-                                                                {request.userId.employeeId && (
+                                                                {request.userId?.employeeId && (
                                                                     <>
                                                                         <div>
                                                                             <Label className="text-sm font-medium">Employee ID</Label>
@@ -294,7 +294,7 @@ const PermissionManagement: React.FC = () => {
                                                                         </div>
                                                                         <div>
                                                                             <Label className="text-sm font-medium">Designation</Label>
-                                                                            <p className="text-sm text-muted-foreground">{request.userId.designation || 'N/A'}</p>
+                                                                            <p className="text-sm text-muted-foreground">{request.userId?.designation || 'N/A'}</p>
                                                                         </div>
                                                                     </>
                                                                 )}
@@ -383,14 +383,14 @@ const PermissionManagement: React.FC = () => {
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-3">
                                             <Avatar>
-                                                <AvatarImage src={request.userId.profilePicture} />
+                                                <AvatarImage src={request.userId?.profilePicture} />
                                                 <AvatarFallback>
-                                                    {request.userId.name.split(' ').map(n => n[0]).join('')}
+                                                    {request.userId?.name?.split(' ').map(n => n[0]).join('') || 'U'}
                                                 </AvatarFallback>
                                             </Avatar>
                                             <div>
-                                                <h3 className="font-semibold">{request.userId.name}</h3>
-                                                <p className="text-sm text-muted-foreground">{request.userId.email}</p>
+                                                <h3 className="font-semibold">{request.userId?.name || 'Unknown User'}</h3>
+                                                <p className="text-sm text-muted-foreground">{request.userId?.email || 'No email'}</p>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">

@@ -7,10 +7,12 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { authAPI } from '@/services/api';
+import { Eye, EyeOff } from 'lucide-react';
 
 const Login: React.FC = () => {
   const [form, setForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { login: authLogin } = useAuth();
@@ -25,21 +27,21 @@ const Login: React.FC = () => {
     try {
       const response = await authAPI.login({ email: form.email, password: form.password });
       const { user, token } = response.data;
-      
+
       if (user && token) {
         // Save auth data first
         localStorage.setItem('auth_token', token);
         localStorage.setItem('user_data', JSON.stringify(user));
-        
+
         // Then update auth context
         authLogin(user, token);
-        
+
         toast({
           title: "Success",
           description: "Login successful! Redirecting...",
           variant: "default",
         });
-        
+
         // Use replace to prevent back navigation to login
         navigate('/', { replace: true });
       } else {
@@ -80,15 +82,32 @@ const Login: React.FC = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                placeholder="••••••••"
-                value={form.password}
-                onChange={handleChange}
-                required
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={form.password}
+                  onChange={handleChange}
+                  required
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
             </div>
             <Button type="submit" disabled={loading} className="w-full">
               {loading ? 'Signing in...' : 'Sign in'}

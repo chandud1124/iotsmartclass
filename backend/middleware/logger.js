@@ -1,55 +1,22 @@
-const winston = require('winston');
-const path = require('path');
-const { format } = winston;
-
-// Override Winston Console transport to prevent EPIPE errors
-const originalConsoleTransport = winston.transports.Console;
-winston.transports.Console = class SafeConsole extends originalConsoleTransport {
-    log(info, callback) {
-        try {
-            super.log(info, callback);
-        } catch (error) {
-            if (error.code === 'EPIPE') {
-                // Silently ignore EPIPE errors
-                if (callback) callback();
-                return;
-            }
-            throw error;
+// Simple console logger to replace Winston temporarily
+const logger = {
+    info: (message, ...args) => {
+        if (process.env.NODE_ENV === 'development') {
+            console.log(`[INFO] ${new Date().toISOString()} ${message}`, ...args);
+        }
+    },
+    error: (message, ...args) => {
+        console.error(`[ERROR] ${new Date().toISOString()} ${message}`, ...args);
+    },
+    warn: (message, ...args) => {
+        console.warn(`[WARN] ${new Date().toISOString()} ${message}`, ...args);
+    },
+    debug: (message, ...args) => {
+        if (process.env.NODE_ENV === 'development') {
+            console.debug(`[DEBUG] ${new Date().toISOString()} ${message}`, ...args);
         }
     }
 };
-
-// Configure Winston logger
-const logger = winston.createLogger({
-    level: process.env.LOG_LEVEL || 'info',
-    format: format.combine(
-        format.timestamp(),
-        format.json()
-    ),
-    transports: [
-        new winston.transports.File({
-            filename: path.join(__dirname, '../../logs/error.log'),
-            level: 'error'
-        }),
-        new winston.transports.File({
-            filename: path.join(__dirname, '../../logs/combined.log')
-        })
-    ]
-});
-
-// Add console transport in development
-// Temporarily disabled to prevent EPIPE crashes
-// if (process.env.NODE_ENV !== 'production') {
-//     logger.add(new winston.transports.Console({
-//         format: format.combine(
-//             format.colorize(),
-//             format.simple()
-//         ),
-//         handleExceptions: true,
-//         handleRejections: true,
-//         stderrLevels: ['error', 'warn', 'info', 'debug']
-//     }));
-// }
 
 const errorLogger = (err, req, res, next) => {
     const errorDetails = {
@@ -64,16 +31,8 @@ const errorLogger = (err, req, res, next) => {
             url: req.url,
             body: req.body,
             query: req.query,
-            params: req.params,
-            headers: {
-                ...req.headers,
-                authorization: req.headers.authorization ? '[REDACTED]' : undefined
-            }
-        },
-        user: req.user ? {
-            id: req.user.id,
-            email: req.user.email
-        } : null
+            params: req.params
+        }
     };
 
     // Log error details
@@ -87,10 +46,6 @@ const errorLogger = (err, req, res, next) => {
         code: err.code || 'INTERNAL_ERROR',
         timestamp: errorDetails.timestamp
     };
-
-    if (process.env.NODE_ENV !== 'production') {
-        response.details = errorDetails;
-    }
 
     res.status(statusCode).json(response);
 };

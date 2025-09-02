@@ -26,6 +26,7 @@ const Profile = lazy(() => import("./pages/Profile").then(module => ({ default: 
 const PermissionManagement = lazy(() => import("./pages/PermissionManagement"));
 const UserProfile = lazy(() => import("./pages/UserProfile"));
 const ClassroomAccessPage = lazy(() => import("./pages/ClassroomAccessPage"));
+const RoleManagement = lazy(() => import("./pages/RoleManagement"));
 const ForgotPassword = lazy(() => import("./components/ForgotPassword"));
 const ResetPassword = lazy(() => import("./components/ResetPassword"));
 
@@ -68,9 +69,7 @@ const App = () => {
                   element={
                     <PrivateRoute>
                       <DevicesProvider>
-                        <Layout>
-                          <Outlet />
-                        </Layout>
+                        <Layout />
                       </DevicesProvider>
                     </PrivateRoute>
                   }
@@ -84,6 +83,7 @@ const App = () => {
                   <Route path="settings" element={<Settings />} />
                   <Route path="profile" element={<UserProfile />} />
                   <Route path="permissions" element={<PermissionManagement />} />
+                  <Route path="roles" element={<RoleManagement />} />
                   <Route path="classroom-access" element={<ClassroomAccessPage />} />
                 </Route>
 

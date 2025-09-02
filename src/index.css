@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -9,21 +8,21 @@
     /* Core Brand Colors */
     --background: 220 13% 9%;
     --foreground: 210 40% 98%;
-    
+
     /* Cards & Surfaces */
     --card: 220 13% 11%;
     --card-foreground: 210 40% 98%;
     --popover: 220 13% 11%;
     --popover-foreground: 210 40% 98%;
-    
+
     /* Electric Blue Primary */
     --primary: 193 100% 50%;
     --primary-foreground: 220 13% 9%;
-    
+
     /* Emerald Success */
     --secondary: 159 71% 40%;
     --secondary-foreground: 210 40% 98%;
-    
+
     /* Status Colors */
     --success: 159 71% 40%;
     --success-foreground: 210 40% 98%;
@@ -31,26 +30,26 @@
     --warning-foreground: 220 13% 9%;
     --danger: 0 84% 60%;
     --danger-foreground: 210 40% 98%;
-    
+
     /* Neutral Surfaces */
     --muted: 215 16% 18%;
     --muted-foreground: 215 16% 65%;
     --accent: 215 16% 16%;
     --accent-foreground: 210 40% 98%;
-    
+
     /* Interactive Elements */
-    --border: 215 16% 20%;
+    --border: 215 16% 15%;
     --input: 215 16% 16%;
     --ring: 193 100% 50%;
-    
+
     /* Component Variants */
-    --glass-bg: 220 13% 11% / 0.8;
-    --glass-border: 215 16% 25% / 0.3;
+    --glass-bg: 220 13% 11% / 0.85;
+    --glass-border: 215 16% 18% / 0.4;
     --device-online: 159 71% 40%;
     --device-offline: 215 16% 35%;
     --switch-on: 159 71% 40%;
     --switch-off: 215 16% 35%;
-    
+
     --radius: 0.75rem;
   }
 }
@@ -59,54 +58,92 @@
   * {
     @apply border-border;
   }
-  
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
     background: linear-gradient(135deg, hsl(220 13% 9%) 0%, hsl(215 16% 12%) 100%);
     min-height: 100vh;
+    overflow: hidden;
   }
-  
+
   /* Glass morphism utilities */
   .glass {
     background: hsla(var(--glass-bg));
     border: 1px solid hsla(var(--glass-border));
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
+    position: relative;
+    box-shadow:
+      0 4px 6px -1px hsla(0 0% 0% / 0.1),
+      0 2px 4px -2px hsla(0 0% 0% / 0.1),
+      inset 0 1px 0 hsla(255 255% 255% / 0.1);
   }
-  
-  /* Device status indicators */
-  .status-online {
-    @apply bg-success/20 text-success border-success/30;
+
+  /* Fallback for browsers that don't support backdrop-filter */
+  @supports not (backdrop-filter: blur(20px)) {
+    .glass {
+      background: linear-gradient(135deg, hsla(220 13% 9% / 0.9) 0%, hsla(215 16% 12% / 0.9) 100%);
+      border: 1px solid hsla(215 16% 18% / 0.7);
+      box-shadow:
+        0 4px 6px -1px hsla(0 0% 0% / 0.1),
+        0 2px 4px -2px hsla(0 0% 0% / 0.1);
+    }
   }
-  
-  .status-offline {
-    @apply bg-muted text-muted-foreground border-border;
+
+  /* Fix SVG alignment and sizing */
+  svg {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
   }
-  
+
+  /* Ensure button SVGs are properly aligned */
+  button svg {
+    align-self: center;
+    margin-top: auto;
+    margin-bottom: auto;
+  }
+
   /* Switch animations */
   .switch-toggle {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  
+
   .switch-on {
-    @apply bg-success text-success-foreground shadow-lg;
-    box-shadow: 0 0 20px hsla(var(--success) / 0.3);
+    background-color: hsl(var(--success));
+    color: hsl(var(--success-foreground));
+    box-shadow: 0 0 20px hsla(var(--success) / 0.3), 0 10px 15px -3px hsla(0, 0%, 0%, 0.1), 0 4px 6px -4px hsla(0, 0%, 0%, 0.1);
   }
-  
+
   .switch-off {
-    @apply bg-muted text-muted-foreground;
+    background-color: hsl(var(--muted));
+    color: hsl(var(--muted-foreground));
   }
 }
 
 /* Pulse animations for real-time indicators */
 @keyframes pulse-online {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.6;
+  }
 }
 
 @keyframes pulse-switch {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.05);
+  }
 }
 
 .animate-pulse-online {

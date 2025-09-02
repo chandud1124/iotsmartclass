@@ -17,7 +17,7 @@ process.on('uncaughtException', (error) => {
     // Silently ignore EPIPE errors from logging
     return;
   }
-  logger.error('Uncaught Exception:', error);
+  console.error('Uncaught Exception:', error);
   process.exit(1);
 });
 
@@ -26,7 +26,7 @@ process.on('unhandledRejection', (reason, promise) => {
     // Silently ignore EPIPE errors from logging
     return;
   }
-  logger.error('Unhandled Rejection:', reason);
+  console.error('Unhandled Rejection:', reason);
 });
 
 // Enable request logging
@@ -97,6 +97,12 @@ const connectDB = async (retries = 5) => {
     } catch (adminError) {
       logger.error('Admin user creation error:', adminError);
     }
+    // Initialize schedule service after DB connection
+    try {
+      await scheduleService.initialize();
+    } catch (scheduleError) {
+      logger.error('Schedule service initialization error:', scheduleError);
+    }
   } catch (err) {
     const msg = err && (err.message || String(err));
     logger.error('MongoDB connection error (continuing in LIMITED MODE):', msg);
@@ -112,6 +118,12 @@ const connectDB = async (retries = 5) => {
         dbConnected = true;
         logger.info('Connected to MongoDB via fallback URI');
         try { await createAdminUser(); } catch (adminError) { logger.error('Admin user creation error:', adminError); }
+        // Initialize schedule service after DB connection
+        try {
+          await scheduleService.initialize();
+        } catch (scheduleError) {
+          logger.error('Schedule service initialization error:', scheduleError);
+        }
         return;
       } catch (fallbackErr) {
         logger.error('Fallback MongoDB URI connection failed:', fallbackErr.message || fallbackErr);
@@ -242,9 +254,16 @@ const io = socketIo(server, {
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true
   },
-  // Try disabling per-message deflate to rule out frame corruption
+  // WebSocket configuration to prevent frame corruption
   perMessageDeflate: false,
-  allowEIO3: false
+  allowEIO3: false,
+  // Force polling transport to avoid WebSocket upgrade issues
+  transports: ['polling', 'websocket'],
+  // Additional settings for stability
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  upgradeTimeout: 30000,
+  maxHttpBufferSize: 1e8
 });
 
 io.engine.on('connection_error', (err) => {
@@ -832,13 +851,16 @@ if (io && io.opts) {
 }
 server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
   const host = process.env.HOST || '0.0.0.0';
-  logger.info(`Server running on ${host}:${PORT}`);
+  console.log(`Server running on ${host}:${PORT}`);
   if (host === '0.0.0.0') {
-    logger.info(`Server accessible on all network interfaces`);
+    console.log(`Server accessible on all network interfaces`);
   } else {
-    logger.info(`Server bound to specific IP: ${host}`);
+    console.log(`Server bound to specific IP: ${host}`);
   }
-  logger.info(`Environment: ${process.env.NODE_ENV}`);
+  console.log(`Environment: ${process.env.NODE_ENV}`);
+
+  // Connect to database after server starts
+  // connectDB().catch(() => { });
 });
 
 module.exports = { app, io };

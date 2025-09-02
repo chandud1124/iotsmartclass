@@ -16,7 +16,7 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'user' | 'security' | 'faculty';
+  role: 'admin' | 'principal' | 'dean' | 'hod' | 'faculty' | 'security' | 'student' | 'user';
   isActive: boolean;
   lastLogin: Date;
   assignedDevices: string[];
@@ -278,8 +278,12 @@ const Users = () => {
   const getRoleIcon = (role: string) => {
     switch (role) {
       case 'admin': return <Shield className="w-4 h-4" />;
+      case 'principal': return <Shield className="w-4 h-4" />;
+      case 'dean': return <Shield className="w-4 h-4" />;
+      case 'hod': return <Shield className="w-4 h-4" />;
       case 'faculty': return <GraduationCap className="w-4 h-4" />;
       case 'security': return <ShieldCheck className="w-4 h-4" />;
+      case 'student': return <User className="w-4 h-4" />;
       default: return <User className="w-4 h-4" />;
     }
   };
@@ -287,8 +291,12 @@ const Users = () => {
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'admin': return 'default';
+      case 'principal': return 'default';
+      case 'dean': return 'default';
+      case 'hod': return 'default';
       case 'faculty': return 'secondary';
       case 'security': return 'destructive';
+      case 'student': return 'outline';
       default: return 'outline';
     }
   };

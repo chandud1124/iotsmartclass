@@ -16,11 +16,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const departments = [
   'Information Technology',
-  'Computer Science',
   'Electrical Engineering',
-  'Mechanical Engineering',
-  'Civil Engineering',
   'Business Administration',
+  'Management Studies',
   'Security',
   'Maintenance',
   'Administration',
@@ -30,11 +28,54 @@ const departments = [
 ];
 
 const roles = [
-  { value: 'student', label: 'Student', description: 'Access to basic classroom devices and schedules' },
-  { value: 'faculty', label: 'Faculty/Teacher', description: 'Can control devices and request class extensions' },
-  { value: 'hod', label: 'Head of Department', description: 'Department oversight and approval permissions' },
-  { value: 'security', label: 'Security Personnel', description: 'Security monitoring and access control' },
-  { value: 'user', label: 'General Staff', description: 'Limited access to system features' }
+  {
+    value: 'admin',
+    label: 'Administrator',
+    description: 'Full system access, user management, and approval permissions',
+    permissions: { canRequestExtensions: true, canApproveExtensions: true, canManageUsers: true, canViewReports: true }
+  },
+  {
+    value: 'principal',
+    label: 'Principal',
+    description: 'School-wide oversight and approval permissions',
+    permissions: { canRequestExtensions: true, canApproveExtensions: true, canManageUsers: false, canViewReports: true }
+  },
+  {
+    value: 'dean',
+    label: 'Dean',
+    description: 'Faculty oversight and departmental approval permissions',
+    permissions: { canRequestExtensions: true, canApproveExtensions: true, canManageUsers: false, canViewReports: true }
+  },
+  {
+    value: 'hod',
+    label: 'Head of Department',
+    description: 'Department oversight and approval permissions',
+    permissions: { canRequestExtensions: true, canApproveExtensions: true, canManageUsers: false, canViewReports: false }
+  },
+  {
+    value: 'faculty',
+    label: 'Faculty/Teacher',
+    description: 'Can control devices and request class extensions',
+    permissions: { canRequestExtensions: true, canApproveExtensions: false, canManageUsers: false, canViewReports: false }
+  },
+  {
+    value: 'security',
+    label: 'Security Personnel',
+    description: 'Security monitoring and access control',
+    permissions: { canRequestExtensions: false, canApproveExtensions: false, canManageUsers: false, canViewReports: false }
+  },
+  {
+    value: 'student',
+    label: 'Student',
+    description: 'Access to basic classroom devices and schedules',
+    permissions: { canRequestExtensions: false, canApproveExtensions: false, canManageUsers: false, canViewReports: false }
+  },
+  {
+    value: 'user',
+    label: 'General Staff',
+    description: 'Limited access to system features',
+    permissions: { canRequestExtensions: false, canApproveExtensions: false, canManageUsers: false, canViewReports: false }
+  }
 ];
 
 const Register: React.FC = () => {
@@ -49,12 +90,7 @@ const Register: React.FC = () => {
     role: '',
     department: '',
     employeeId: '',
-    phone: '',
-    designation: '',
-    reason: '',
-    agreeToTerms: false,
-    agreeToPrivacy: false,
-    agreeToDataProcessing: false
+    designation: ''
   });
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -113,14 +149,9 @@ const Register: React.FC = () => {
         if (form.password !== form.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
         break;
 
-      case 3: // Professional Details & Terms
+      case 3: // Professional Details
         if (form.role !== 'student' && !form.employeeId.trim()) newErrors.employeeId = 'Employee ID is required';
-        if (!form.phone.match(/^\+?[\d\s\-\(\)]+$/)) newErrors.phone = 'Valid phone number is required';
         if (form.role !== 'student' && !form.designation.trim()) newErrors.designation = 'Designation is required';
-        if (!form.reason.trim()) newErrors.reason = 'Please provide a reason for registration';
-        if (!form.agreeToTerms) newErrors.agreeToTerms = 'You must agree to terms and conditions';
-        if (!form.agreeToPrivacy) newErrors.agreeToPrivacy = 'You must agree to privacy policy';
-        if (!form.agreeToDataProcessing) newErrors.agreeToDataProcessing = 'You must agree to data processing';
         break;
     }
 
@@ -152,9 +183,7 @@ const Register: React.FC = () => {
         role: form.role,
         department: form.department,
         employeeId: form.employeeId || undefined,
-        phone: form.phone || undefined,
-        designation: form.designation || undefined,
-        reason: form.reason || undefined
+        designation: form.designation || undefined
       };
 
       const response = await authAPI.register(userData);
@@ -243,15 +272,15 @@ const Register: React.FC = () => {
             <div className="space-y-2">
               <Label htmlFor="role">Role *</Label>
               <Select name="role" value={form.role} onValueChange={(value) => setForm(prev => ({ ...prev, role: value }))}>
-                <SelectTrigger className={errors.role ? 'border-red-500' : ''}>
+                <SelectTrigger className={cn("w-full", errors.role ? 'border-red-500' : '')}>
                   <SelectValue placeholder="Select your role" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="w-full min-w-[var(--radix-select-trigger-width)]">
                   {roles.map((role) => (
-                    <SelectItem key={role.value} value={role.value}>
-                      <div>
-                        <div className="font-medium">{role.label}</div>
-                        <div className="text-sm text-muted-foreground">{role.description}</div>
+                    <SelectItem key={role.value} value={role.value} className="cursor-pointer">
+                      <div className="flex flex-col items-start py-1">
+                        <div className="font-medium text-left w-full">{role.label}</div>
+                        <div className="text-sm text-muted-foreground text-left w-full">{role.description}</div>
                       </div>
                     </SelectItem>
                   ))}
@@ -381,19 +410,6 @@ const Register: React.FC = () => {
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number *</Label>
-              <Input
-                id="phone"
-                name="phone"
-                placeholder="+1 (555) 123-4567"
-                value={form.phone}
-                onChange={handleChange}
-                className={errors.phone ? 'border-red-500' : ''}
-              />
-              {errors.phone && <p className="text-sm text-red-500">{errors.phone}</p>}
-            </div>
-
             {form.role !== 'student' && (
               <div className="space-y-2">
                 <Label htmlFor="designation">Designation *</Label>
@@ -409,63 +425,14 @@ const Register: React.FC = () => {
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="reason">Reason for Registration *</Label>
-              <Textarea
-                id="reason"
-                name="reason"
-                placeholder="Please explain why you need access to the IoT classroom management system..."
-                value={form.reason}
-                onChange={handleChange}
-                className={cn("min-h-[100px]", errors.reason ? 'border-red-500' : '')}
-              />
-              {errors.reason && <p className="text-sm text-red-500">{errors.reason}</p>}
-            </div>
-
             <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="terms"
-                  checked={form.agreeToTerms}
-                  onCheckedChange={(checked) => setForm(prev => ({ ...prev, agreeToTerms: checked as boolean }))}
-                />
-                <Label htmlFor="terms" className="text-sm">
-                  I agree to the <Button variant="link" className="p-0 h-auto text-sm">Terms and Conditions</Button>
-                </Label>
-              </div>
-              {errors.agreeToTerms && <p className="text-sm text-red-500">{errors.agreeToTerms}</p>}
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="privacy"
-                  checked={form.agreeToPrivacy}
-                  onCheckedChange={(checked) => setForm(prev => ({ ...prev, agreeToPrivacy: checked as boolean }))}
-                />
-                <Label htmlFor="privacy" className="text-sm">
-                  I agree to the <Button variant="link" className="p-0 h-auto text-sm">Privacy Policy</Button>
-                </Label>
-              </div>
-              {errors.agreeToPrivacy && <p className="text-sm text-red-500">{errors.agreeToPrivacy}</p>}
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="data-processing"
-                  checked={form.agreeToDataProcessing}
-                  onCheckedChange={(checked) => setForm(prev => ({ ...prev, agreeToDataProcessing: checked as boolean }))}
-                />
-                <Label htmlFor="data-processing" className="text-sm">
-                  I consent to the processing of my personal data
-                </Label>
-              </div>
-              {errors.agreeToDataProcessing && <p className="text-sm text-red-500">{errors.agreeToDataProcessing}</p>}
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  Your registration will be reviewed by an administrator. You will receive an email notification once your account is approved.
+                </AlertDescription>
+              </Alert>
             </div>
-
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertDescription>
-                Your registration will be reviewed by an administrator. You will receive an email notification once your account is approved.
-              </AlertDescription>
-            </Alert>
           </div>
         );
 

@@ -37,12 +37,12 @@ const useDevicesInternal = () => {
       // Normalize incoming state switches to ensure id & relayGpio fields persist
       const normalizedSwitches = Array.isArray((data.state as any).switches)
         ? (data.state as any).switches.map((sw: any) => ({
-            ...sw,
-            id: sw.id || sw._id?.toString(),
-            relayGpio: sw.relayGpio ?? sw.gpio
-          }))
+          ...sw,
+          id: sw.id || sw._id?.toString(),
+          relayGpio: sw.relayGpio ?? sw.gpio
+        }))
         : [];
-  // Do not override server confirmations during bulk; trust normalizedSwitches
+      // Do not override server confirmations during bulk; trust normalizedSwitches
       if (process.env.NODE_ENV !== 'production') {
         const diff = normalizedSwitches.filter((sw: any) => {
           const existing = device.switches.find(esw => esw.id === sw.id);
@@ -113,9 +113,45 @@ const useDevicesInternal = () => {
   interface LoadOptions { background?: boolean; force?: boolean }
   // Backoff tracking to prevent hammering API on repeated failures (e.g., 401 before login)
   const failureBackoffRef = useRef<number>(0);
+  // Debouncing for loadDevices to prevent excessive API calls
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastCallTimeRef = useRef<number>(0);
+  const DEBOUNCE_MS = 1000; // Minimum 1 second between API calls
+
   async function loadDevices(options: LoadOptions = {}) {
     const { background, force } = options;
-    if (!force && Date.now() - lastLoaded < STALE_MS) return;
+    const now = Date.now();
+
+    // If force=true, execute immediately (bypass debouncing)
+    if (force) {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+        debounceTimeoutRef.current = null;
+      }
+      return executeLoadDevices(options);
+    }
+
+    // Check if we're within debounce window
+    if (now - lastCallTimeRef.current < DEBOUNCE_MS) {
+      // Cancel existing timeout and schedule a new one
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+      debounceTimeoutRef.current = setTimeout(() => {
+        executeLoadDevices(options);
+      }, DEBOUNCE_MS - (now - lastCallTimeRef.current));
+      return;
+    }
+
+    // Execute immediately if outside debounce window
+    return executeLoadDevices(options);
+  }
+
+  async function executeLoadDevices(options: LoadOptions = {}) {
+    const { background } = options;
+    lastCallTimeRef.current = Date.now();
+
+    if (Date.now() - lastLoaded < STALE_MS) return;
     // Respect backoff window after failures
     if (Date.now() < failureBackoffRef.current) return;
     // Skip fetching if no auth token yet (pre-login) to avoid 401 storm
@@ -159,7 +195,7 @@ const useDevicesInternal = () => {
   }
 
   useEffect(() => {
-  loadDevices({ force: true });
+    loadDevices({ force: true });
 
     // Set up socket listeners
     socketService.onDeviceStateChanged(handleDeviceStateChanged);
@@ -196,7 +232,7 @@ const useDevicesInternal = () => {
       }));
       // Light reconciliation: if actualState missing or still inconsistent after small delay, reload that device
       if (payload.actualState === undefined) {
-        setTimeout(()=> loadDevices({ force:true, background:true }), 400);
+        setTimeout(() => loadDevices({ force: true, background: true }), 400);
       }
     };
     socketService.on('device_toggle_blocked', handleToggleBlocked);
@@ -244,13 +280,13 @@ const useDevicesInternal = () => {
         const incoming = Array.isArray(cfg.switches) ? cfg.switches : [];
         const mapped = incoming.map((sw: any) => {
           const existing = d.switches.find(esw => esw.id === (sw.id || sw._id) || esw.name === sw.name);
-            return {
-              ...(existing || {}),
-              ...sw,
-              id: sw.id || sw._id?.toString(),
-              relayGpio: sw.relayGpio ?? sw.gpio,
-              state: sw.state // backend authoritative here
-            };
+          return {
+            ...(existing || {}),
+            ...sw,
+            id: sw.id || sw._id?.toString(),
+            relayGpio: sw.relayGpio ?? sw.gpio,
+            state: sw.state // backend authoritative here
+          };
         });
         return { ...d, switches: mapped };
       }));
@@ -287,12 +323,22 @@ const useDevicesInternal = () => {
       socketService.off('device_pir_triggered', handleDevicePirTriggered);
       socketService.off('device_connected', handleConnected);
       socketService.off('device_toggle_blocked', handleToggleBlocked);
-  socketService.off('bulk_state_sync', handleBulkSync);
-  socketService.off('switch_intent', handleSwitchIntent);
-  socketService.off('bulk_switch_intent', handleBulkIntent);
+      socketService.off('bulk_state_sync', handleBulkSync);
+      socketService.off('switch_intent', handleSwitchIntent);
+      socketService.off('bulk_switch_intent', handleBulkIntent);
       socketService.off('config_update', handleConfigUpdate);
       socketService.off('switch_result', handleSwitchResult);
-  socketService.off('identify_error', handleIdentifyError);
+      socketService.off('identify_error', handleIdentifyError);
+      // Clean up debounce timeout
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+        debounceTimeoutRef.current = null;
+      }
+      // Clean up stats debounce timeout
+      if (statsDebounceTimeoutRef.current) {
+        clearTimeout(statsDebounceTimeoutRef.current);
+        statsDebounceTimeoutRef.current = null;
+      }
     };
   }, [handleDeviceStateChanged, handleDevicePirTriggered]);
 
@@ -349,7 +395,7 @@ const useDevicesInternal = () => {
   const toggleAllSwitches = async (state: boolean) => {
     try {
       // Mark as pending without flipping state
-      setBulkPending({ desiredState: state, startedAt: Date.now(), deviceIds: new Set(devices.filter(d=>d.status==='online').map(d=>d.id)) });
+      setBulkPending({ desiredState: state, startedAt: Date.now(), deviceIds: new Set(devices.filter(d => d.status === 'online').map(d => d.id)) });
       // Prefer bulk endpoint if available
       try {
         // Only attempt bulk toggle if at least one online device
@@ -377,7 +423,7 @@ const useDevicesInternal = () => {
       console.error('Error toggling all switches:', err);
       throw err;
     } finally {
-      setTimeout(()=> {
+      setTimeout(() => {
         setBulkPending(prev => {
           if (prev) {
             // After window, reconcile if any device still inconsistent
@@ -442,11 +488,11 @@ const useDevicesInternal = () => {
           type: sw.type || 'relay'
         }));
       }
-  // Sanitize numeric fields to avoid NaN
-  if (mapped.pirGpio !== undefined && isNaN(mapped.pirGpio)) delete mapped.pirGpio;
-  if (mapped.pirAutoOffDelay !== undefined && isNaN(mapped.pirAutoOffDelay)) delete mapped.pirAutoOffDelay;
+      // Sanitize numeric fields to avoid NaN
+      if (mapped.pirGpio !== undefined && isNaN(mapped.pirGpio)) delete mapped.pirGpio;
+      if (mapped.pirAutoOffDelay !== undefined && isNaN(mapped.pirAutoOffDelay)) delete mapped.pirAutoOffDelay;
       const response = await deviceAPI.createDevice(mapped);
-      
+
       if (!response.data) {
         throw new Error('No data received from server');
       }
@@ -461,7 +507,7 @@ const useDevicesInternal = () => {
         })) : []
       };
       console.log('Device added:', newDevice);
-      
+
       setDevices(prev => [...prev, newDevice]);
       return newDevice;
     } catch (err: any) {
@@ -478,7 +524,7 @@ const useDevicesInternal = () => {
       if (updates.switches) {
         outbound.switches = updates.switches.map(sw => ({
           ...sw,
-            gpio: (sw as any).relayGpio ?? (sw as any).gpio
+          gpio: (sw as any).relayGpio ?? (sw as any).gpio
         }));
       }
       const response = await deviceAPI.updateDevice(deviceId, outbound);
@@ -512,7 +558,33 @@ const useDevicesInternal = () => {
     }
   };
 
+  // Debouncing for getStats to prevent excessive API calls
+  const statsDebounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastStatsCallTimeRef = useRef<number>(0);
+  const STATS_DEBOUNCE_MS = 2000; // Minimum 2 seconds between stats API calls
+
   const getStats = async (): Promise<DeviceStats> => {
+    const now = Date.now();
+
+    // Check if we're within debounce window
+    if (now - lastStatsCallTimeRef.current < STATS_DEBOUNCE_MS) {
+      // Cancel existing timeout and schedule a new one
+      if (statsDebounceTimeoutRef.current) {
+        clearTimeout(statsDebounceTimeoutRef.current);
+      }
+      return new Promise((resolve) => {
+        statsDebounceTimeoutRef.current = setTimeout(() => {
+          executeGetStats().then(resolve);
+        }, STATS_DEBOUNCE_MS - (now - lastStatsCallTimeRef.current));
+      });
+    }
+
+    // Execute immediately if outside debounce window
+    return executeGetStats();
+  };
+
+  const executeGetStats = async (): Promise<DeviceStats> => {
+    lastStatsCallTimeRef.current = Date.now();
     try {
       const response = await deviceAPI.getStats();
       return response.data.data;
@@ -541,13 +613,13 @@ const useDevicesInternal = () => {
     addDevice,
     updateDevice,
     deleteDevice,
-  getStats,
+    getStats,
     refreshDevices: loadDevices,
     toggleDeviceAllSwitches,
     bulkToggleType,
     lastLoaded,
-  isStale: Date.now() - lastLoaded > STALE_MS,
-  bulkPending
+    isStale: Date.now() - lastLoaded > STALE_MS,
+    bulkPending
   };
 };
 
