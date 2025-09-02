@@ -35,11 +35,15 @@
 
 3. Configure switch names and types:
    ```cpp
-   const String SWITCH_NAMES[4] = {
-     "LED Lights",
-     "Ceiling Fan", 
+   const String SWITCH_NAMES[8] = {
+     "Fan1",
+     "Fan2",
+     "Light1",
+     "Light2",
      "Projector",
-     "Smart Board"
+     "NComputing",
+     "AC Unit",
+     "Printer"
    };
    ```
 

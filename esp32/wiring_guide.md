@@ -3,10 +3,10 @@
 
 ## Components Needed:
 - ESP32 Development Board
-- 4-Channel Relay Module (5V)
+- 8-Channel Relay Module (5V) - Recommended for full 8-switch setup
 - PIR Motion Sensor (HC-SR501)
-- 4x Push Button Switches (for manual override)
-- 4x 10kΩ Pull-up Resistors
+- 8x Push Button Switches (for manual override)
+- 8x 10kΩ Pull-up Resistors
 - Jumper Wires
 - Breadboard or PCB
 - 5V Power Supply for Relays
@@ -14,13 +14,17 @@
 
 ## Pin Connections:
 
-### ESP32 to 4-Channel Relay Module:
+### ESP32 to 8-Channel Relay Module:
 ```
 ESP32 Pin    ->    Relay Module
-GPIO 2       ->    IN1 (Relay 1 - Main Lights)
-GPIO 4       ->    IN2 (Relay 2 - Ceiling Fan)  
-GPIO 5       ->    IN3 (Relay 3 - Projector)
-GPIO 18      ->    IN4 (Relay 4 - Smart Board)
+GPIO 4       ->    IN1 (Relay 1 - Fan1)
+GPIO 16      ->    IN2 (Relay 2 - Fan2)
+GPIO 17      ->    IN3 (Relay 3 - Light1)
+GPIO 5       ->    IN4 (Relay 4 - Light2)
+GPIO 19      ->    IN5 (Relay 5 - Projector)
+GPIO 18      ->    IN6 (Relay 6 - NComputing)
+GPIO 21      ->    IN7 (Relay 7 - AC Unit)
+GPIO 22      ->    IN8 (Relay 8 - Printer)
 5V           ->    VCC
 GND          ->    GND
 ```
@@ -36,19 +40,27 @@ GND          ->    GND
 ### ESP32 to Manual Override Switches:
 ```
 ESP32 Pin    ->    Switch Connection
-GPIO 14      ->    Switch 1 (one terminal) -> 10kΩ to 3.3V
-GPIO 12      ->    Switch 2 (one terminal) -> 10kΩ to 3.3V
-GPIO 13      ->    Switch 3 (one terminal) -> 10kΩ to 3.3V
-GPIO 15      ->    Switch 4 (one terminal) -> 10kΩ to 3.3V
+GPIO 25      ->    Switch 1 (Fan1) - one terminal -> 10kΩ to 3.3V
+GPIO 27      ->    Switch 2 (Fan2) - one terminal -> 10kΩ to 3.3V
+GPIO 32      ->    Switch 3 (Light1) - one terminal -> 10kΩ to 3.3V
+GPIO 33      ->    Switch 4 (Light2) - one terminal -> 10kΩ to 3.3V
+GPIO 12      ->    Switch 5 (Projector) - one terminal -> 10kΩ to 3.3V
+GPIO 14      ->    Switch 6 (NComputing) - one terminal -> 10kΩ to 3.3V
+GPIO 13      ->    Switch 7 (AC Unit) - one terminal -> 10kΩ to 3.3V
+GPIO 15      ->    Switch 8 (Printer) - one terminal -> 10kΩ to 3.3V
 GND          ->    Other terminal of all switches
 ```
 
 ### AC Load Connections (⚠️ HIGH VOLTAGE - ELECTRICIAN REQUIRED):
 ```
-Relay 1 NO (Normally Open) -> Main Lights Hot Wire
-Relay 2 NO                  -> Ceiling Fan Hot Wire
-Relay 3 NO                  -> Projector Hot Wire
-Relay 4 NO                  -> Smart Board Hot Wire
+Relay 1 NO (Normally Open) -> Fan1 Hot Wire
+Relay 2 NO                  -> Fan2 Hot Wire
+Relay 3 NO                  -> Light1 Hot Wire
+Relay 4 NO                  -> Light2 Hot Wire
+Relay 5 NO                  -> Projector Hot Wire
+Relay 6 NO                  -> NComputing Hot Wire
+Relay 7 NO                  -> AC Unit Hot Wire
+Relay 8 NO                  -> Printer Hot Wire
 
 Common (COM) of all relays  -> Main AC Hot Wire (220V/110V)
 AC Neutral                  -> Direct to all loads
