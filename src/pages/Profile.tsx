@@ -135,7 +135,6 @@ export const Profile = () => {
   return (
     <div className="container max-w-2xl py-8 space-y-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Profile Settings</h1>
         <Button
           variant="outline"
           size="icon"

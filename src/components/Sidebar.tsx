@@ -12,7 +12,9 @@ import {
   ChevronLeft,
   Power,
   User,
-  UserCheck
+  UserCheck,
+  FileText,
+  Activity
 } from 'lucide-react';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAuth } from '@/hooks/useAuth';
@@ -56,10 +58,11 @@ const navigationSections = [
     ]
   },
   {
-    title: 'System',
+    title: 'Administration',
     items: [
-      { name: 'Settings', icon: Settings, href: '/settings', current: false },
-    ]
+      { name: 'Active Logs', icon: FileText, href: '/logs', current: false, adminOnly: true },
+    ],
+    adminOnly: true
   }
 ];
 
@@ -108,7 +111,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigateClose }) 
       className
     )}>
       {/* Logo/Brand */}
-      <div className="p-2 flex-shrink-0 min-h-12 relative z-10 glass">
+      <div className="p-2 flex-shrink-0 h-16 relative z-10 glass">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center flex-shrink-0">
             <Shield className="w-5 h-5 text-primary-foreground" />
@@ -126,7 +129,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigateClose }) 
       <nav className="flex-1 p-2 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent min-h-0 relative z-10 glass">
         {navigationSections.map((section, sectionIndex) => {
           // Filter items based on permissions
-          const visibleItems = section.items.filter((item) => {
+          const visibleItems = section.items.filter((item: any) => {
+            if (item.adminOnly && !isAdmin) {
+              return false;
+            }
             if (item.requiresPermission) {
               const perms = usePermissions();
               return perms[item.requiresPermission as keyof typeof perms];
@@ -134,8 +140,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigateClose }) 
             return true;
           });
 
-          // Skip section if no visible items
-          if (visibleItems.length === 0) return null;
+          // Skip section if no visible items or section is admin-only and user is not admin
+          if (visibleItems.length === 0 || (section.adminOnly && !isAdmin)) return null;
 
           return (
             <div key={section.title} className="space-y-1">
@@ -187,7 +193,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigateClose }) 
           variant="ghost"
           size="sm"
           onClick={() => setCollapsed(!collapsed)}
-          className="w-full justify-center h-8"
+          className="w-full justify-center h-8 hover:bg-primary/10 hover:text-primary focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 border-0"
         >
           {collapsed ? (
             <ChevronRight className="w-4 h-4" />

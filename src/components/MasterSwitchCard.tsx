@@ -58,7 +58,7 @@ export const MasterSwitchCard: React.FC<MasterSwitchCardProps> = ({
   const mixed = !allOff && !allMasterOn;
 
   // Whenever upstream counts change, clear forced override so UI reflects real aggregate.
-  useEffect(()=>{ setForcedState(null); }, [activeSwitches, totalSwitches]);
+  useEffect(() => { setForcedState(null); }, [activeSwitches, totalSwitches]);
   const effectiveChecked = forcedState !== null ? forcedState : allMasterOn;
 
   // Device status counts
@@ -67,7 +67,7 @@ export const MasterSwitchCard: React.FC<MasterSwitchCardProps> = ({
   const totalDevices = devices.length;
 
   // Get all available switches from devices
-  const allSwitches = devices.flatMap(device => 
+  const allSwitches = devices.flatMap(device =>
     device.switches.map(sw => ({
       id: `${device.id}-${sw.id}`,
       name: `${device.name} - ${sw.name}`,
@@ -92,9 +92,9 @@ export const MasterSwitchCard: React.FC<MasterSwitchCardProps> = ({
       switches: newSwitch.selectedSwitches
     });
 
-  setNewSwitch({ name: '', accessCode: '', selectedSwitches: [], _search: '', _classroom: '', _type: '' });
+    setNewSwitch({ name: '', accessCode: '', selectedSwitches: [], _search: '', _classroom: '', _type: '' });
     setShowCreateDialog(false);
-    
+
     toast({
       title: "Custom Switch Created",
       description: `"${newSwitch.name}" has been created successfully`
@@ -134,7 +134,7 @@ export const MasterSwitchCard: React.FC<MasterSwitchCardProps> = ({
                     <div className="max-w-xs text-xs">
                       <p className="font-semibold mb-1">Offline Devices:</p>
                       {offlineList.length === 0 && <p>None</p>}
-                      {offlineList.slice(0,8).map(d => (
+                      {offlineList.slice(0, 8).map(d => (
                         <p key={d.id}>{d.name}</p>
                       ))}
                       {offlineList.length > 8 && (
@@ -210,10 +210,12 @@ export const MasterSwitchCard: React.FC<MasterSwitchCardProps> = ({
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">Custom Master Switches</h3>
-          <Button onClick={() => setShowCreateDialog(true)} size="sm">
-            <Plus className="w-4 h-4 mr-2" />
-            Create Group
-          </Button>
+          <div className="ml-auto">
+            <Button onClick={() => setShowCreateDialog(true)} size="sm">
+              <Plus className="w-4 h-4 mr-2" />
+              Create Group
+            </Button>
+          </div>
         </div>
 
         {customSwitches.length === 0 ? (
@@ -240,34 +242,34 @@ export const MasterSwitchCard: React.FC<MasterSwitchCardProps> = ({
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
-      {/* Confirm Delete Custom Switch Dialog */}
-      <Dialog open={!!confirmDeleteId} onOpenChange={() => setConfirmDeleteId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Custom Master Switch</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p>Are you sure you want to delete this custom master switch group? This action cannot be undone.</p>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  if (confirmDeleteId) {
-                    deleteCustomSwitch(confirmDeleteId);
-                    setConfirmDeleteId(null);
-                    toast({ title: 'Custom Master Switch Deleted', description: 'The group has been deleted.' });
-                  }
-                }}
-              >
-                Delete
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+                    {/* Confirm Delete Custom Switch Dialog */}
+                    <Dialog open={!!confirmDeleteId} onOpenChange={() => setConfirmDeleteId(null)}>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Delete Custom Master Switch</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <p>Are you sure you want to delete this custom master switch group? This action cannot be undone.</p>
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>
+                              Cancel
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              onClick={() => {
+                                if (confirmDeleteId) {
+                                  deleteCustomSwitch(confirmDeleteId);
+                                  setConfirmDeleteId(null);
+                                  toast({ title: 'Custom Master Switch Deleted', description: 'The group has been deleted.' });
+                                }
+                              }}
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                   <p className="text-xs text-muted-foreground mb-3">
                     {customSwitch.switches.length} switches in this group
@@ -326,18 +328,18 @@ export const MasterSwitchCard: React.FC<MasterSwitchCardProps> = ({
               <Input
                 id="switch-name"
                 value={newSwitch.name}
-                onChange={(e) => setNewSwitch({...newSwitch, name: e.target.value})}
+                onChange={(e) => setNewSwitch({ ...newSwitch, name: e.target.value })}
                 placeholder="e.g., Living Room Lights"
               />
             </div>
-            
+
             <div>
               <Label htmlFor="access-code">Access Code (Optional)</Label>
               <Input
                 id="access-code"
                 type="password"
                 value={newSwitch.accessCode}
-                onChange={(e) => setNewSwitch({...newSwitch, accessCode: e.target.value})}
+                onChange={(e) => setNewSwitch({ ...newSwitch, accessCode: e.target.value })}
                 placeholder="Enter access code for security"
               />
             </div>

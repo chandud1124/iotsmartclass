@@ -211,15 +211,6 @@ const RoleManagement: React.FC = () => {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold flex items-center gap-2">
-                        <Shield className="w-6 h-6" />
-                        Role Management
-                    </h2>
-                    <p className="text-muted-foreground">
-                        Configure permissions for different user roles in the system
-                    </p>
-                </div>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={resetToDefaults}>
                         <RefreshCw className="w-4 h-4 mr-2" />

@@ -199,6 +199,26 @@ const createDevice = async (req, res) => {
       req.app.get('io').emit('device_state_changed', { deviceId: device.id, state: device, ts: Date.now() });
     }
 
+    // Emit notification to all connected users with appropriate permissions
+    if (req.app.get('io')) {
+      req.app.get('io').emit('device_notification', {
+        type: 'device_created',
+        message: `New device "${device.name}" created in ${device.location}`,
+        deviceId: device._id,
+        deviceName: device.name,
+        location: device.location,
+        metadata: {
+          deviceId: device._id,
+          deviceName: device.name,
+          deviceLocation: device.location,
+          deviceClassroom: device.classroom,
+          createdBy: req.user.name,
+          switchCount: device.switches.length
+        },
+        timestamp: new Date()
+      });
+    }
+
     // Push updated config to ESP32 if connected (include manual fields)
     try {
       if (global.wsDevices && device.macAddress) {
@@ -378,6 +398,26 @@ const updateDevice = async (req, res) => {
       emitDeviceStateChanged(device, { source: 'controller:updateDevice' });
     } else {
       req.app.get('io').emit('device_state_changed', { deviceId: device.id, state: device, ts: Date.now() });
+    }
+
+    // Emit notification to all connected users with appropriate permissions
+    if (req.app.get('io')) {
+      req.app.get('io').emit('device_notification', {
+        type: 'device_updated',
+        message: `Device "${device.name}" was updated in ${device.location}`,
+        deviceId: device._id,
+        deviceName: device.name,
+        location: device.location,
+        metadata: {
+          deviceId: device._id,
+          deviceName: device.name,
+          deviceLocation: device.location,
+          deviceClassroom: device.classroom,
+          updatedBy: req.user.name,
+          switchCount: device.switches.length
+        },
+        timestamp: new Date()
+      });
     }
 
     // If any switches were removed, proactively send OFF command for their relay gpios to ensure hardware deactivates them
@@ -680,6 +720,26 @@ const deleteDevice = async (req, res) => {
       emitDeviceStateChanged({ id: device.id, deleted: true }, { source: 'controller:deleteDevice' });
     } else {
       req.app.get('io').emit('device_state_changed', { deviceId: device.id, deleted: true, ts: Date.now() });
+    }
+
+    // Emit notification to all connected users with appropriate permissions
+    if (req.app.get('io')) {
+      req.app.get('io').emit('device_notification', {
+        type: 'device_deleted',
+        message: `Device "${device.name}" was deleted from ${device.location}`,
+        deviceId: device._id,
+        deviceName: device.name,
+        location: device.location,
+        metadata: {
+          deviceId: device._id,
+          deviceName: device.name,
+          deviceLocation: device.location,
+          deviceClassroom: device.classroom,
+          deletedBy: req.user.name,
+          switchCount: device.switches.length
+        },
+        timestamp: new Date()
+      });
     }
 
     res.json({ success: true, message: 'Device deleted successfully' });

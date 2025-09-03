@@ -265,4 +265,43 @@ export const securityAPI = {
   createAlert: (alertData: any) => api.post('/security/alerts', alertData),
 };
 
+export const ticketAPI = {
+  createTicket: (ticketData: {
+    title: string;
+    description: string;
+    category: string;
+    priority?: string;
+    department?: string;
+    location?: string;
+    deviceId?: string;
+    tags?: string[];
+  }) => api.post('/tickets', ticketData),
+
+  getTickets: (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    category?: string;
+    priority?: string;
+    search?: string;
+  }) => api.get('/tickets', { params }),
+
+  getTicket: (ticketId: string) => api.get(`/tickets/${ticketId}`),
+
+  updateTicket: (ticketId: string, updates: {
+    status?: string;
+    assignedTo?: string;
+    priority?: string;
+    resolution?: string;
+    estimatedHours?: number;
+    actualHours?: number;
+    comment?: string;
+    isInternal?: boolean;
+  }) => api.put(`/tickets/${ticketId}`, updates),
+
+  deleteTicket: (ticketId: string) => api.delete(`/tickets/${ticketId}`),
+
+  getTicketStats: () => api.get('/tickets/stats'),
+};
+
 export default api;

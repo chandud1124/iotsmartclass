@@ -14,7 +14,7 @@ export const Layout = () => {
         <Sidebar className={`${isMobile ? 'hidden' : 'flex-shrink-0 block'}`} />
         <div className="flex-1 flex flex-col min-w-0 relative ml-0 overflow-hidden">
           <Header />
-          <main className="flex-1 overflow-y-auto p-6 min-h-0">
+          <main className="flex-1 overflow-y-auto p-4 min-h-0">
             <Outlet />
           </main>
         </div>

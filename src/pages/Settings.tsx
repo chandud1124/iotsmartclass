@@ -35,31 +35,23 @@ const Settings = () => {
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">
-            System Settings
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Configure your IoT control system
-          </p>
-        </div>
       </div>
 
       <Tabs defaultValue="notifications" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="notifications" className="flex items-center">
+        <TabsList className="grid w-full grid-cols-2 border-0">
+          <TabsTrigger value="notifications" className="flex items-center focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0">
             <Bell className="w-4 h-4 mr-2" />
             Notifications
           </TabsTrigger>
-          <TabsTrigger value="security" className="flex items-center">
+          <TabsTrigger value="security" className="flex items-center focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0">
             <Shield className="w-4 h-4 mr-2" />
             Security
           </TabsTrigger>
         </TabsList>
 
 
-        <TabsContent value="notifications">
-          <Card>
+        <TabsContent value="notifications" className="focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0">
+          <Card className="border-0">
             <CardHeader>
               <CardTitle>Notification Settings</CardTitle>
             </CardHeader>
@@ -77,7 +69,7 @@ const Settings = () => {
                   disabled={loading}
                 />
               </div>
-              
+
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label>Push Notifications</Label>
@@ -98,7 +90,7 @@ const Settings = () => {
                   <Input
                     placeholder="Enter email addresses"
                     value={settings.notifications.email.recipients.join(', ')}
-                    onChange={(e) => 
+                    onChange={(e) =>
                       updateSettings({
                         notifications: {
                           ...settings.notifications,
@@ -119,8 +111,8 @@ const Settings = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="security">
-          <Card>
+        <TabsContent value="security" className="focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0">
+          <Card className="border-0">
             <CardHeader>
               <CardTitle>Security Settings</CardTitle>
             </CardHeader>

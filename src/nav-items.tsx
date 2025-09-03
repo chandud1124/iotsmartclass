@@ -1,5 +1,5 @@
 
-import { Home, Zap, Calendar, Users as UsersIcon, Settings as SettingsIcon, Bell, LogOut, Shield, UserCheck, User } from "lucide-react";
+import { Home, Zap, Calendar, Users as UsersIcon, Settings as SettingsIcon, Bell, LogOut, Shield, UserCheck, User, Ticket } from "lucide-react";
 import Index from "./pages/Index";
 import Devices from "./pages/Devices";
 import Switches from "./pages/Switches";
@@ -9,6 +9,7 @@ import Users from "./pages/Users";
 import PermissionManagement from "./pages/PermissionManagement";
 import UserProfile from "./pages/UserProfile";
 import Settings from "./pages/Settings";
+import Tickets from "./pages/Tickets";
 import NotFound from "./pages/NotFound";
 
 export const navItems = [
@@ -70,6 +71,14 @@ export const navItems = [
     to: "/classroom-access",
     icon: <Shield className="h-4 w-4" />,
     page: <PermissionManagement />, // Reusing existing component
+  },
+
+  // Support
+  {
+    title: "Support Tickets",
+    to: "/tickets",
+    icon: <Ticket className="h-4 w-4" />,
+    page: <Tickets />,
   },
 
   // Account

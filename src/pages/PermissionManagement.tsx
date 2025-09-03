@@ -171,10 +171,6 @@ const PermissionManagement: React.FC = () => {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold">Permission Management</h1>
-                    <p className="text-muted-foreground">Review and manage user registration requests</p>
-                </div>
                 <div className="flex gap-2">
                     <Badge variant="outline">
                         {requests.filter(r => r.status === 'pending').length} Pending

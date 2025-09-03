@@ -14,7 +14,7 @@ const Master = () => {
   const { toast } = useToast();
 
   // Separate live (online devices) vs offline device switches
-  const liveSwitches = devices.filter(d => d.status === 'online').flatMap(device => 
+  const liveSwitches = devices.filter(d => d.status === 'online').flatMap(device =>
     device.switches.map(sw => ({
       ...sw,
       deviceName: device.name,
@@ -23,7 +23,7 @@ const Master = () => {
       location: device.location || 'Unknown'
     }))
   );
-  const offlineSwitches = devices.filter(d => d.status !== 'online').flatMap(device => 
+  const offlineSwitches = devices.filter(d => d.status !== 'online').flatMap(device =>
     device.switches.map(sw => ({
       ...sw,
       deviceName: device.name,
@@ -46,7 +46,7 @@ const Master = () => {
   };
   const switchesByType = Object.entries(rawTypeGroups)
     .filter(([, list]) => list.length > 0)
-    .reduce<Record<string, typeof liveSwitches>>((acc,[k,v]) => { acc[k]=v; return acc; }, {});
+    .reduce<Record<string, typeof liveSwitches>>((acc, [k, v]) => { acc[k] = v; return acc; }, {});
   const hasTypeGroups = Object.keys(switchesByType).length > 0;
 
   const onlineDevices = devices.filter(d => d.status === 'online').length;
@@ -161,118 +161,152 @@ const Master = () => {
   };
 
   return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">
-              Master Control
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Control all devices and switches from one place
-            </p>
-          </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+      </div>
+
+      {/* Master Switch Controls */}
+      <MasterSwitchCard
+        totalSwitches={totalSwitches}
+        activeSwitches={activeSwitches}
+        offlineDevices={devices.filter(d => d.status !== 'online').length}
+        onMasterToggle={handleMasterToggle}
+        isBusy={false}
+      />
+
+      {/* Summary Stats */}
+      <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
+        <div className="p-4 rounded-md border bg-muted/30 flex flex-col items-start">
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">Devices Online</span>
+          <span className="text-xl font-semibold">{onlineDevices}</span>
         </div>
-
-        {/* Master Switch Controls */}
-        <MasterSwitchCard
-          totalSwitches={totalSwitches}
-          activeSwitches={activeSwitches}
-          offlineDevices={devices.filter(d => d.status !== 'online').length}
-          onMasterToggle={handleMasterToggle}
-          isBusy={false}
-        />
-
-        {/* Summary Stats */}
-        <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
-          <div className="p-4 rounded-md border bg-muted/30 flex flex-col items-start">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">Devices Online</span>
-            <span className="text-xl font-semibold">{onlineDevices}</span>
-          </div>
-          <div className="p-4 rounded-md border bg-muted/30 flex flex-col items-start">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">Devices Offline</span>
-            <span className="text-xl font-semibold">{offlineDevices}</span>
-          </div>
-            <div className="p-4 rounded-md border bg-muted/30 flex flex-col items-start">
-              <span className="text-xs uppercase tracking-wide text-muted-foreground">Live Switches On</span>
-              <span className="text-xl font-semibold">{activeSwitches}</span>
-              {offlineActiveSwitches > 0 && (
-                <span className="text-[10px] mt-1 text-muted-foreground">+{offlineActiveSwitches} offline last-known on</span>
-              )}
-            </div>
-            <div className="p-4 rounded-md border bg-muted/30 flex flex-col items-start">
-              <span className="text-xs uppercase tracking-wide text-muted-foreground">Switches Off</span>
-              <span className="text-xl font-semibold">{switchesOff}</span>
-            </div>
+        <div className="p-4 rounded-md border bg-muted/30 flex flex-col items-start">
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">Devices Offline</span>
+          <span className="text-xl font-semibold">{offlineDevices}</span>
         </div>
+        <div className="p-4 rounded-md border bg-muted/30 flex flex-col items-start">
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">Live Switches On</span>
+          <span className="text-xl font-semibold">{activeSwitches}</span>
+          {offlineActiveSwitches > 0 && (
+            <span className="text-[10px] mt-1 text-muted-foreground">+{offlineActiveSwitches} offline last-known on</span>
+          )}
+        </div>
+        <div className="p-4 rounded-md border bg-muted/30 flex flex-col items-start">
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">Switches Off</span>
+          <span className="text-xl font-semibold">{switchesOff}</span>
+        </div>
+      </div>
 
-        {/* Quick Controls by Type (hidden if all empty) */}
-        {hasTypeGroups && (
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold">Control by Type</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {Object.entries(switchesByType).map(([type, switches]) => {
-                const activeCount = switches.filter(sw => sw.state).length;
-                const total = switches.length;
-                const allOn = activeCount === total && total > 0;
-                const getIcon = () => {
-                  switch (type) {
-                    case 'light': return <Lightbulb className="w-5 h-5" />;
-                    case 'fan': return <Fan className="w-5 h-5" />;
-                    case 'outlet': return <Power className="w-5 h-5" />;
-                    case 'relay': return <Zap className="w-5 h-5" />;
-                    default: return <Zap className="w-5 h-5" />;
-                  }
-                };
-                const label = `${type.charAt(0).toUpperCase()+type.slice(1)}s`;
-                const onlineInGroup = switches.some(sw => sw.deviceStatus === 'online');
-                return (
-                  <Card key={type} className="glass">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        {getIcon()} {label}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground">
-                            {activeCount} on / {total - activeCount} off
-                          </p>
-                        </div>
-                        <Button
-                          variant={allOn ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => handleTypeToggle(type, !allOn)}
-                          disabled={!onlineInGroup}
-                        >
-                          {allOn ? 'Turn Off' : 'Turn On'}
-                        </Button>
-                      </div>
-                      <Badge variant="secondary" className="w-fit">{total} {type}s</Badge>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Control by Block / Floor */}
+      {/* Quick Controls by Type (hidden if all empty) */}
+      {hasTypeGroups && (
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold">Control by Block & Floor</h2>
+          <h2 className="text-xl font-semibold">Control by Type</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Object.entries(switchesByType).map(([type, switches]) => {
+              const activeCount = switches.filter(sw => sw.state).length;
+              const total = switches.length;
+              const allOn = activeCount === total && total > 0;
+              const getIcon = () => {
+                switch (type) {
+                  case 'light': return <Lightbulb className="w-5 h-5" />;
+                  case 'fan': return <Fan className="w-5 h-5" />;
+                  case 'outlet': return <Power className="w-5 h-5" />;
+                  case 'relay': return <Zap className="w-5 h-5" />;
+                  default: return <Zap className="w-5 h-5" />;
+                }
+              };
+              const label = `${type.charAt(0).toUpperCase() + type.slice(1)}s`;
+              const onlineInGroup = switches.some(sw => sw.deviceStatus === 'online');
+              return (
+                <Card key={type} className="glass">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      {getIcon()} {label}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">
+                          {activeCount} on / {total - activeCount} off
+                        </p>
+                      </div>
+                      <Button
+                        variant={allOn ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => handleTypeToggle(type, !allOn)}
+                        disabled={!onlineInGroup}
+                      >
+                        {allOn ? 'Turn Off' : 'Turn On'}
+                      </Button>
+                    </div>
+                    <Badge variant="secondary" className="w-fit">{total} {type}s</Badge>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Control by Block / Floor */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">Control by Block & Floor</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {sortedBlockFloorEntries.map(([key, switches]) => {
+            const [block, floor] = key.split('::');
+            const activeCount = switches.filter(sw => sw.state).length;
+            const total = switches.length;
+            const allOn = activeCount === total && total > 0;
+            const anyOnline = switches.some(sw => sw.deviceStatus === 'online');
+            return (
+              <Card key={key} className="glass">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Building2 className="w-5 h-5" />
+                    Block {block} • Floor {floor}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        {activeCount} of {total} switches on
+                      </p>
+                    </div>
+                    <Button
+                      variant={allOn ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleBlockFloorToggle(block, floor, !allOn)}
+                      disabled={total === 0 || !anyOnline}
+                    >
+                      {allOn ? 'Turn Off' : 'Turn On'}
+                    </Button>
+                  </div>
+                  <Badge variant="secondary" className="w-fit">{total} switches</Badge>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Labs */}
+      {labEntries.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Labs</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sortedBlockFloorEntries.map(([key, switches]) => {
-              const [block, floor] = key.split('::');
+            {labEntries.map(([labLocation, switches]) => {
               const activeCount = switches.filter(sw => sw.state).length;
               const total = switches.length;
               const allOn = activeCount === total && total > 0;
               const anyOnline = switches.some(sw => sw.deviceStatus === 'online');
               return (
-                <Card key={key} className="glass">
+                <Card key={labLocation} className="glass">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-lg flex items-center gap-2">
-                      <Building2 className="w-5 h-5" />
-                      Block {block} • Floor {floor}
+                      <FlaskConical className="w-5 h-5" />
+                      {labLocation}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -285,7 +319,7 @@ const Master = () => {
                       <Button
                         variant={allOn ? 'default' : 'outline'}
                         size="sm"
-                        onClick={() => handleBlockFloorToggle(block, floor, !allOn)}
+                        onClick={() => handleLabToggle(labLocation, !allOn)}
                         disabled={total === 0 || !anyOnline}
                       >
                         {allOn ? 'Turn Off' : 'Turn On'}
@@ -298,50 +332,8 @@ const Master = () => {
             })}
           </div>
         </div>
-
-        {/* Labs */}
-        {labEntries.length > 0 && (
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold">Labs</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {labEntries.map(([labLocation, switches]) => {
-                const activeCount = switches.filter(sw => sw.state).length;
-                const total = switches.length;
-                const allOn = activeCount === total && total > 0;
-                const anyOnline = switches.some(sw => sw.deviceStatus === 'online');
-                return (
-                  <Card key={labLocation} className="glass">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <FlaskConical className="w-5 h-5" />
-                        {labLocation}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground">
-                            {activeCount} of {total} switches on
-                          </p>
-                        </div>
-                        <Button
-                          variant={allOn ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => handleLabToggle(labLocation, !allOn)}
-                          disabled={total === 0 || !anyOnline}
-                        >
-                          {allOn ? 'Turn Off' : 'Turn On'}
-                        </Button>
-                      </div>
-                      <Badge variant="secondary" className="w-fit">{total} switches</Badge>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
+      )}
+    </div>
   );
 };
 

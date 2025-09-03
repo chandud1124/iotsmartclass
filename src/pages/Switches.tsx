@@ -25,7 +25,7 @@ const Switches = () => {
 
   // Persist collapsed state
   useEffect(() => {
-    try { localStorage.setItem('switches_collapsed', JSON.stringify(collapsed)); } catch {}
+    try { localStorage.setItem('switches_collapsed', JSON.stringify(collapsed)); } catch { }
   }, [collapsed]);
 
   const locations = useMemo(() => {
@@ -79,10 +79,6 @@ const Switches = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Switches by Device</h1>
-          <p className="text-muted-foreground mt-1">Control each device's switches individually</p>
-        </div>
         <div className="flex gap-3 items-end flex-wrap justify-end">
           <div className="flex flex-col gap-1">
             <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Search</label>
@@ -117,8 +113,8 @@ const Switches = () => {
         totalSwitches={totalSwitches}
         activeSwitches={activeSwitches}
         offlineDevices={devices.filter(d => d.status !== 'online').length}
-  onMasterToggle={handleMasterToggle}
-  isBusy={false}
+        onMasterToggle={handleMasterToggle}
+        isBusy={false}
       />
 
       {filteredDevices.length === 0 ? (
@@ -137,7 +133,7 @@ const Switches = () => {
             const hasSchedules = device.switches.some(sw => (sw as any).schedule?.length || (sw as any).schedules?.length);
             return (
               <Card key={device.id} className={`border shadow-sm flex flex-col ${hasSchedules ? 'ring-1 ring-blue-300' : ''}`}>
-                <CardHeader className="pb-3 cursor-pointer px-4 py-3" onClick={() => setCollapsed(c => ({...c, [device.id]: !c[device.id]}))}>
+                <CardHeader className="pb-3 cursor-pointer px-4 py-3" onClick={() => setCollapsed(c => ({ ...c, [device.id]: !c[device.id] }))}>
                   <div className="flex justify-between items-start gap-3">
                     <div className="min-w-0">
                       <CardTitle className="text-base flex items-center gap-2">

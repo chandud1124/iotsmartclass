@@ -33,8 +33,8 @@ router.post('/toggle', auth, async (req, res) => {
             });
         }
 
-        const results = await BulkOperations.bulkToggleSwitches(devices, switchId, state);
-        
+        const results = await BulkOperations.bulkToggleSwitches(devices, switchId, state, req);
+
         // Send real-time updates through WebSocket for all affected devices
         const io = req.app.get('io');
         results.successful.forEach(result => {

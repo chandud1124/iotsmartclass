@@ -27,8 +27,10 @@ const PermissionManagement = lazy(() => import("./pages/PermissionManagement"));
 const UserProfile = lazy(() => import("./pages/UserProfile"));
 const ClassroomAccessPage = lazy(() => import("./pages/ClassroomAccessPage"));
 const RoleManagement = lazy(() => import("./pages/RoleManagement"));
+const ActiveLogs = lazy(() => import("./pages/ActiveLogs"));
 const ForgotPassword = lazy(() => import("./components/ForgotPassword"));
 const ResetPassword = lazy(() => import("./components/ResetPassword"));
+const Tickets = lazy(() => import("./pages/Tickets"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -85,6 +87,8 @@ const App = () => {
                   <Route path="permissions" element={<PermissionManagement />} />
                   <Route path="roles" element={<RoleManagement />} />
                   <Route path="classroom-access" element={<ClassroomAccessPage />} />
+                  <Route path="logs" element={<ActiveLogs />} />
+                  <Route path="tickets" element={<Tickets />} />
                 </Route>
 
                 <Route path="*" element={<NotFound />} />

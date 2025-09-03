@@ -217,10 +217,6 @@ const Schedule: React.FC = () => {
     <>
       {/* Top Bar / Toolbar */}
       <div className="flex items-center justify-between py-4 px-2 bg-background border-b mb-6">
-        <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold text-foreground">Schedule Management</h1>
-          <span className="text-muted-foreground text-sm">Automate classroom lighting and devices</span>
-        </div>
         <Button onClick={() => setDialogOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
           Add Schedule

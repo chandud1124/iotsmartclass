@@ -91,6 +91,23 @@ router.post('/', authorize('admin'), async (req, res) => {
       // fire-and-forget email
       sendTempPasswordEmail(email, tempPassword).catch(() => { });
     }
+
+    // Emit notification to all connected admin users
+    if (req.app.get('io')) {
+      req.app.get('io').emit('user_notification', {
+        type: 'user_created',
+        message: `New user "${user.name}" (${user.email}) created with role: ${user.role}`,
+        metadata: {
+          userId: user._id,
+          userName: user.name,
+          userEmail: user.email,
+          userRole: user.role,
+          createdBy: req.user.name
+        },
+        timestamp: new Date()
+      });
+    }
+
     res.status(201).json(response);
   } catch (error) {
     res.status(500).json({ message: 'Error creating user' });
@@ -168,6 +185,24 @@ router.put('/:id(' + objectIdPattern + ')', authorize('admin'), async (req, res)
     if (process.env.NODE_ENV !== 'production') {
       console.log('[users:update] updated', req.params.id, update);
     }
+
+    // Emit notification to all connected admin users
+    if (req.app.get('io')) {
+      req.app.get('io').emit('user_notification', {
+        type: 'user_updated',
+        message: `User "${user.name}" (${user.email}) was updated`,
+        metadata: {
+          userId: user._id,
+          userName: user.name,
+          userEmail: user.email,
+          userRole: user.role,
+          updatedBy: req.user.name,
+          changes: update
+        },
+        timestamp: new Date()
+      });
+    }
+
     res.json(toClientUser(user));
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') console.error('[users:update] error', error);
@@ -229,6 +264,23 @@ router.delete('/:id(' + objectIdPattern + ')', authorize('admin'), async (req, r
     }
     const user = await User.findByIdAndDelete(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Emit notification to all connected admin users
+    if (req.app.get('io')) {
+      req.app.get('io').emit('user_notification', {
+        type: 'user_deleted',
+        message: `User "${user.name}" (${user.email}) was deleted`,
+        metadata: {
+          userId: user._id,
+          userName: user.name,
+          userEmail: user.email,
+          userRole: user.role,
+          deletedBy: req.user.name
+        },
+        timestamp: new Date()
+      });
+    }
+
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ message: 'Error deleting user' });

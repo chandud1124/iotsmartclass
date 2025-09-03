@@ -44,7 +44,7 @@
 
     /* Component Variants */
     --glass-bg: 220 13% 11% / 0.85;
-    --glass-border: 215 16% 18% / 0.4;
+    --glass-border: 220 13% 15% / 0.6;
     --device-online: 159 71% 40%;
     --device-offline: 215 16% 35%;
     --switch-on: 159 71% 40%;
@@ -83,7 +83,7 @@
   @supports not (backdrop-filter: blur(20px)) {
     .glass {
       background: linear-gradient(135deg, hsla(220 13% 9% / 0.9) 0%, hsla(215 16% 12% / 0.9) 100%);
-      border: 1px solid hsla(215 16% 18% / 0.7);
+      border: 1px solid hsla(220 13% 15% / 0.7);
       box-shadow:
         0 4px 6px -1px hsla(0 0% 0% / 0.1),
         0 2px 4px -2px hsla(0 0% 0% / 0.1);

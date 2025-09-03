@@ -39,7 +39,7 @@ class ESP32SocketService {
                     socket.deviceData = { macAddress, deviceId: device._id };
 
                     // Update device status
-                    await Device.findByIdAndUpdate(device._id, { 
+                    await Device.findByIdAndUpdate(device._id, {
                         status: 'online',
                         lastSeen: new Date(),
                         ipAddress: socket.handshake.address
@@ -74,7 +74,7 @@ class ESP32SocketService {
         socket.on('state_update', async (data) => {
             try {
                 const { switches, pirState } = data;
-                
+
                 // Update device state in database
                 const updatedDevice = await Device.findByIdAndUpdate(
                     device._id,
@@ -102,7 +102,7 @@ class ESP32SocketService {
         socket.on('pir_triggered', async (data) => {
             try {
                 const { triggered } = data;
-                
+
                 await ActivityLog.create({
                     deviceId: device._id,
                     deviceName: device.name,
@@ -122,11 +122,100 @@ class ESP32SocketService {
             }
         });
 
+        // Handle batch commands from server
+        socket.on('batch_command', async (command) => {
+            try {
+                const { batchId, switches, timestamp } = command;
+                console.log(`ESP32 ${socket.deviceData.macAddress} received batch command ${batchId} with ${switches.length} switches`);
+
+                // Process batch command
+                const results = [];
+                for (const switchCmd of switches) {
+                    try {
+                        // Here you would implement the actual switch control logic
+                        // For now, we'll just acknowledge the command
+                        results.push({
+                            deviceId: switchCmd.deviceId,
+                            switchId: switchCmd.switchId,
+                            success: true,
+                            newState: switchCmd.targetState
+                        });
+                    } catch (error) {
+                        results.push({
+                            deviceId: switchCmd.deviceId,
+                            switchId: switchCmd.switchId,
+                            success: false,
+                            error: error.message
+                        });
+                    }
+                }
+
+                // Send response back to server
+                socket.emit('batch_response', {
+                    batchId,
+                    results,
+                    timestamp: new Date(),
+                    success: results.every(r => r.success)
+                });
+
+            } catch (error) {
+                console.error('Error processing batch command:', error);
+                socket.emit('batch_error', {
+                    batchId: command.batchId,
+                    error: error.message
+                });
+            }
+        });
+
+        // Handle batch command responses from device
+        socket.on('batch_response', async (response) => {
+            try {
+                const { batchId, results, timestamp, success } = response;
+                console.log(`ESP32 ${socket.deviceData.macAddress} completed batch ${batchId}: ${success ? 'SUCCESS' : 'PARTIAL'}`);
+
+                // Here you could emit the response to the main application
+                // For now, we'll just log it
+                if (this.io) {
+                    this.io.emit('batch_completed', {
+                        batchId,
+                        esp32Id: socket.deviceData.macAddress,
+                        results,
+                        success,
+                        timestamp
+                    });
+                }
+
+            } catch (error) {
+                console.error('Error handling batch response:', error);
+            }
+        });
+
+        // Handle batch command errors from device
+        socket.on('batch_error', async (error) => {
+            try {
+                const { batchId, error: errorMessage } = error;
+                console.error(`ESP32 ${socket.deviceData.macAddress} batch ${batchId} failed: ${errorMessage}`);
+
+                // Here you could emit the error to the main application
+                if (this.io) {
+                    this.io.emit('batch_failed', {
+                        batchId,
+                        esp32Id: socket.deviceData.macAddress,
+                        error: errorMessage,
+                        timestamp: new Date()
+                    });
+                }
+
+            } catch (error) {
+                console.error('Error handling batch error:', error);
+            }
+        });
+
         // Handle disconnection
         socket.on('disconnect', async () => {
             try {
                 // Update device status
-                await Device.findByIdAndUpdate(device._id, { 
+                await Device.findByIdAndUpdate(device._id, {
                     status: 'offline',
                     lastSeen: new Date()
                 });
@@ -145,6 +234,72 @@ class ESP32SocketService {
                 console.log(`ESP32 device ${socket.deviceData.macAddress} disconnected`);
             } catch (error) {
                 console.error('Error handling disconnect:', error);
+            }
+        });
+    }
+
+    // Method to send batch command to specific device
+    async sendBatchCommand(macAddress, batchCommand) {
+        const socket = this.deviceSockets.get(macAddress);
+        if (!socket) {
+            throw new Error('Device not connected');
+        }
+
+        return new Promise(async (resolve, reject) => {
+            try {
+                // Convert backend format to ESP32 format
+                const esp32Command = {
+                    type: 'bulk_switch_command',
+                    commands: []
+                };
+
+                // Get device information to map switches to GPIO pins
+                const device = await Device.findOne({ macAddress });
+                if (!device) {
+                    throw new Error('Device not found in database');
+                }
+
+                // Convert each switch command
+                for (const switchCmd of batchCommand.switches) {
+                    // Find the switch in the device
+                    const switchInfo = device.switches.id(switchCmd.switchId);
+                    if (!switchInfo) {
+                        console.warn(`Switch ${switchCmd.switchId} not found in device ${device._id}`);
+                        continue;
+                    }
+
+                    esp32Command.commands.push({
+                        relayGpio: switchInfo.gpio,
+                        state: switchCmd.targetState,
+                        seq: Date.now() // Use timestamp as sequence number
+                    });
+                }
+
+                if (esp32Command.commands.length === 0) {
+                    throw new Error('No valid switches found for batch command');
+                }
+
+                // Set timeout for batch command
+                const timeout = setTimeout(() => {
+                    reject(new Error('Batch command timeout'));
+                }, 10000);
+
+                // Send the formatted command to ESP32
+                socket.emit('command', esp32Command, (response) => {
+                    clearTimeout(timeout);
+                    if (response && response.error) {
+                        reject(new Error(response.error));
+                    } else {
+                        resolve({
+                            batchId: batchCommand.batchId,
+                            processed: esp32Command.commands.length,
+                            response
+                        });
+                    }
+                });
+
+            } catch (error) {
+                reject(error);
             }
         });
     }

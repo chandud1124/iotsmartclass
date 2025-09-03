@@ -228,10 +228,6 @@ const UserProfile: React.FC = () => {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold">Profile</h1>
-                    <p className="text-muted-foreground">Manage your account information and preferences</p>
-                </div>
                 <div className="flex gap-2">
                     {getStatusBadge(profile.isActive, profile.isApproved)}
                     {getRoleBadge(profile.role)}

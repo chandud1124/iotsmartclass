@@ -194,14 +194,6 @@ export const ClassroomAccessManager: React.FC = () => {
     if (error) {
         return (
             <div className="space-y-6">
-                <div className="flex items-center gap-3">
-                    <Shield className="w-8 h-8 text-primary" />
-                    <div>
-                        <h1 className="text-3xl font-bold">Classroom Access Control</h1>
-                        <p className="text-muted-foreground">Manage granular permissions for classroom access</p>
-                    </div>
-                </div>
-
                 <Alert>
                     <AlertTriangle className="w-4 h-4" />
                     <AlertDescription className="flex items-center justify-between">
@@ -227,17 +219,9 @@ export const ClassroomAccessManager: React.FC = () => {
                 <div className="flex items-center gap-3">
                     <Shield className="w-8 h-8 text-primary" />
                     <div>
-                        <h1 className="text-3xl font-bold">Classroom Access Control</h1>
-                        <p className="text-muted-foreground">Manage granular permissions for classroom access</p>
+                        <p className="text-muted-foreground">You must be logged in to access this feature. Please log in and try again.</p>
                     </div>
                 </div>
-
-                <Alert>
-                    <AlertTriangle className="w-4 h-4" />
-                    <AlertDescription>
-                        You must be logged in to access this feature. Please log in and try again.
-                    </AlertDescription>
-                </Alert>
             </div>
         );
     }
@@ -245,14 +229,6 @@ export const ClassroomAccessManager: React.FC = () => {
     return (
         <RoleGuard roles={['admin', 'principal', 'dean', 'hod', 'faculty']}>
             <div className="space-y-6">
-                <div className="flex items-center gap-3">
-                    <Shield className="w-8 h-8 text-primary" />
-                    <div>
-                        <h1 className="text-3xl font-bold">Classroom Access Control</h1>
-                        <p className="text-muted-foreground">Manage granular permissions for classroom access</p>
-                    </div>
-                </div>
-
                 {/* Grant Access Form */}
                 <Card>
                     <CardHeader>

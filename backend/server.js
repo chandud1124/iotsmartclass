@@ -61,6 +61,7 @@ const userRoutes = require('./routes/users');  // Using the new users route
 const activityRoutes = require('./routes/activities');
 const securityRoutes = require('./routes/security');
 const settingsRoutes = require('./routes/settings');
+const ticketRoutes = require('./routes/tickets');
 
 // Import services (only those actively used)
 const scheduleService = require('./services/scheduleService');
@@ -350,6 +351,7 @@ apiRouter.use('/users', apiLimiter, userRoutes);
 apiRouter.use('/activities', apiLimiter, activityRoutes);
 apiRouter.use('/security', apiLimiter, securityRoutes);
 apiRouter.use('/settings', apiLimiter, settingsRoutes);
+apiRouter.use('/tickets', apiLimiter, ticketRoutes);
 // Google Calendar routes (primary path + legacy alias)
 apiRouter.use('/google-calendar', apiLimiter, googleCalendarRoutes);
 apiRouter.use('/calendar', apiLimiter, googleCalendarRoutes); // legacy alias
@@ -812,7 +814,13 @@ setInterval(() => {
 setInterval(async () => {
   try {
     const Device = require('./models/Device');
-    const cutoff = Date.now() - 60000; // 60s stale
+    const Settings = require('./models/Settings');
+
+    // Get configured threshold (default 300 seconds = 5 minutes)
+    const settings = await Settings.findOne();
+    const thresholdSeconds = settings?.security?.deviceOfflineThreshold || 300;
+    const cutoff = Date.now() - (thresholdSeconds * 1000);
+
     const stale = await Device.find({ lastSeen: { $lt: new Date(cutoff) }, status: { $ne: 'offline' } });
     for (const d of stale) {
       d.status = 'offline';
